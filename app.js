@@ -37,6 +37,13 @@
   const ss = { get(k) { try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } }, set(k, v) { try { v ? sessionStorage.setItem(k, v) : sessionStorage.removeItem(k); } catch (e) { /* ignoré */ } } };
   const tok = () => ss.get('lr_tok') || cfg().token;
 
+  // Lien d'invitation : #u=<Nom> (pré-remplit le nom sur l'écran de connexion)
+  (function lienInvitation() {
+    const m = location.hash.match(/^#u=(.+)$/);
+    if (!m) return;
+    try { store.set('lr_nom', decodeURIComponent(m[1])); } catch (e) { /* ignoré */ }
+    history.replaceState(null, '', location.pathname + location.search);
+  })();
   // Lien d'installation : #setup=<URL API>|<clé d'installation>
   (function setupFromHash() {
     const m = location.hash.match(/^#setup=([^|]+)\|(.+)$/);
@@ -537,24 +544,30 @@
       '<form id="uform" style="display:grid;gap:10px;border-top:1px solid var(--line);padding-top:14px">' +
         '<b>Ajouter un utilisateur</b>' +
         '<div class="row3"><div class="field"><label for="u_nom">Nom</label><input type="text" id="u_nom" required></div>' +
+        '<div class="field"><label for="u_mail">E-mail (invitation)</label><input type="email" id="u_mail" placeholder="facultatif" autocomplete="off"></div></div><div class="row3">' +
         '<div class="field"><label for="u_mdp">Mot de passe provisoire</label><input type="text" id="u_mdp" required minlength="6"></div>' +
         '<div class="field"><label for="u_role">Rôle</label><select id="u_role"><option value="utilisateur">Utilisateur</option><option value="admin">Admin</option></select></div></div>' +
-        '<small class="src">La personne devra choisir son propre mot de passe à la première connexion.</small>' +
+        '<small class="src">Avec une adresse e-mail, la personne reçoit directement un mail avec le lien de l\'appli, son nom et son mot de passe provisoire. Elle choisira son propre mot de passe à la première connexion.</small>' +
         '<div class="formbar"><button type="button" class="btn" data-act="me">← Retour</button><button type="submit" class="btn primary">Ajouter</button></div>' +
       '</form></div>';
     $('uform').addEventListener('submit', async e => {
       e.preventDefault(); busy(true, 'Ajout…');
-      try { await api('user_add', { nom: $('u_nom').value.trim(), mdp: $('u_mdp').value, role: $('u_role').value }, { essais: 1 }); toast('Utilisateur ajouté.'); renderUsers(); }
+      try {
+        const j = await api('user_add', { nom: $('u_nom').value.trim(), mdp: $('u_mdp').value, role: $('u_role').value, email: $('u_mail').value.trim() }, { essais: 1 });
+        toast(j.mail ? 'Utilisateur ajouté, invitation envoyée à ' + j.mail + '.' : 'Utilisateur ajouté (pas d\'e-mail : communique-lui le lien, son nom et son mot de passe).'); renderUsers();
+      }
       catch (err) { toast(err.message, true); } finally { busy(false); }
     });
     try {
       const j = await api('users');
       $('ulist').innerHTML = j.users.map(u =>
         '<div class="urow"><b class="' + (u.actif ? '' : 'off') + '">' + esc(u.nom) + '</b><span class="st">' + esc(u.role) + '</span>' +
+        (u.email ? '<span class="st">✉ ' + esc(u.email) + '</span>' : '') +
         (u.doit_changer ? '<span class="st warn">mdp provisoire</span>' : '') +
         (u.nom === S.user.nom ? '' :
           '<input type="text" placeholder="nouveau mdp" data-resetval="' + esc(u.nom) + '" style="width:130px;padding:4px 8px;border:1px solid var(--line);border-radius:8px">' +
-          '<button class="btn sm" data-reset="' + esc(u.nom) + '">Réinitialiser</button>' +
+          (u.email ? '' : '<input type="email" placeholder="e-mail (facultatif)" data-resetmail="' + esc(u.nom) + '" style="width:170px;padding:4px 8px;border:1px solid var(--line);border-radius:8px">') +
+          '<button class="btn sm" data-reset="' + esc(u.nom) + '">' + (u.email ? 'Réinitialiser + mail' : 'Réinitialiser') + '</button>' +
           '<button class="btn sm" data-toggle="' + esc(u.nom) + '" data-actif="' + (u.actif ? '0' : '1') + '">' + (u.actif ? 'Désactiver' : 'Réactiver') + '</button>') +
         '</div>').join('');
     } catch (err) { $('ulist').innerHTML = '<div class="msg err">' + esc(err.message) + '</div>'; }
@@ -624,8 +637,9 @@
     if (t.dataset.reset) {
       const inp = document.querySelector('[data-resetval="' + CSS.escape(t.dataset.reset) + '"]');
       busy(true, 'Réinitialisation…');
-      api('user_reset', { nom: t.dataset.reset, mdp: inp ? inp.value : '' }, { essais: 1 })
-        .then(() => { toast('Mot de passe provisoire enregistré.'); renderUsers(); }).catch(err => toast(err.message, true)).finally(() => busy(false));
+      const im = document.querySelector('[data-resetmail="' + CSS.escape(t.dataset.reset) + '"]');
+      api('user_reset', { nom: t.dataset.reset, mdp: inp ? inp.value : '', email: im ? im.value.trim() : '' }, { essais: 1 })
+        .then(j => { toast(j.mail ? 'Mot de passe provisoire envoyé à ' + j.mail + '.' : 'Mot de passe provisoire enregistré.'); renderUsers(); }).catch(err => toast(err.message, true)).finally(() => busy(false));
       return;
     }
     if (t.dataset.toggle) {
@@ -667,7 +681,7 @@
     if (!tok()) return demarrerSansSession();
     if (force) toast('Mise à jour…');
     try {
-      const d = await api('list');
+      const d = await api('list', force ? { frais: true } : {});
       S.data = d.recettes || []; S.listes = d.listes || {}; S.maj = d.maj || '';
       S.user = d.user; store.set('lr_user', S.user);
       if (d.token && cfg().token) setCfg({ token: d.token });     // session prolongée par le serveur
