@@ -7,6 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
+  const APP_VERSION = 'v5.0';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -59,6 +60,12 @@
   const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
   const linkify = s => esc(s).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
   const catStyle = c => CAT_STYLE[norm(c)] || ['#7a746b', '🍴'];
+  // Illustration quand la recette n'a pas de photo : casserole dessinée sur la couleur de la catégorie
+  const phHtml = c => '<div class="ph" style="' + cvar(c) + '"><svg viewBox="0 0 160 90" aria-hidden="true">' +
+    '<g fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".95">' +
+    '<path d="M66 22c-4-5 4-8 0-13M80 22c-4-5 4-8 0-13M94 22c-4-5 4-8 0-13" opacity=".7"/>' +
+    '<path d="M50 34h60"/><path d="M76 29h8"/><path d="M52 38h56l-4 30a6 6 0 0 1-6 5H62a6 6 0 0 1-6-5z"/>' +
+    '<path d="M52 44H38M108 44h14"/></g><text x="80" y="86" text-anchor="middle" fill="#fff" font-size="9" opacity=".85">' + esc(c || '') + '</text></svg></div>';
   const cvar = c => '--c:' + catStyle(c)[0];
   function photoSrc(u, w) {
     u = String(u || '').trim();
@@ -185,13 +192,18 @@
     const sts = listes().statuts.slice(); S.data.forEach(r => { if (r.statut && sts.indexOf(r.statut) < 0) sts.push(r.statut); });
     $('fStatut').innerHTML = '<option value="">Tous les statuts</option>' + sts.map(s => '<option' + (S.statut === s ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
     const auteurs = []; S.data.forEach(r => { if (r.auteur && auteurs.indexOf(r.auteur) < 0) auteurs.push(r.auteur); });
-    $('fAuteur').innerHTML = '<option value="">Tous les auteurs</option><option value="__moi"' + (S.auteur === '__moi' ? ' selected' : '') + '>Mes recettes</option>' +
-      auteurs.sort().map(a => '<option' + (S.auteur === a ? ' selected' : '') + '>' + esc(a) + '</option>').join('');
+    auteurs.sort((a, b) => a.localeCompare(b, 'fr'));
+    $('authors').innerHTML = '<span class="lbl">👤 Ajoutées par</span>' +
+      ['<button class="chip' + (S.auteur ? '' : ' on') + '" data-auteur="">Tout le monde</button>']
+      .concat(auteurs.map(a => '<button class="chip' + (S.auteur === a ? ' on' : '') + '" data-auteur="' + esc(a) + '">' + esc(a) +
+        ' <small>' + S.data.filter(r => r.auteur === a).length + '</small></button>')).join('');
   }
 
+  window.phHtmlGlobal = img => phHtml(img.closest('.card') ? img.closest('.card').querySelector('.cat').textContent : '');
   function chrome(loggedIn, withFilters) {
     ['btnReload', 'btnBook', 'btnNew', 'btnMe'].forEach(id => { $(id).hidden = !loggedIn; });
     if (loggedIn && S.user) $('btnMe').textContent = S.user.nom.charAt(0).toUpperCase();
+    $('ver').textContent = APP_VERSION;
     $('filters').style.display = withFilters ? '' : 'none';
   }
 
@@ -201,14 +213,14 @@
     const list = filtered();
     const prenom = S.user ? S.user.nom : '';
     let h = '<section class="hero"><h2>Bonjour ' + esc(prenom) + ' !</h2><p>' + S.data.length + ' recette' + (S.data.length > 1 ? 's' : '') +
-      ' dans le livre' + (S.maj ? ' · mis à jour ' + esc(S.maj) : '') + '</p></section>';
+      ' dans le livre' + (S.maj ? ' · mis à jour ' + esc(S.maj) : '') + ' · appli ' + APP_VERSION + '</p></section>';
     if (!S.data.length) { app.innerHTML = h + '<div class="empty">Aucune recette pour l\'instant. Ajoute la première avec « + Recette ».</div>'; return; }
     h += '<div class="count">' + list.length + ' résultat' + (list.length > 1 ? 's' : '') + '</div>';
     if (!list.length) h += '<div class="empty">Aucune recette ne correspond aux filtres.</div>';
     h += '<div class="grid">' + list.map(r => {
       const ms = mainStep(r);
       return '<div class="card" data-id="' + esc(r.id) + '" style="' + cvar(r.categorie) + '">' +
-        (r.photo_url ? '<img class="thumb" loading="lazy" src="' + esc(photoSrc(r.photo_url, 600)) + '" alt="">' : '<div class="ph">' + catStyle(r.categorie)[1] + '</div>') +
+        (r.photo_url ? '<img class="thumb" loading="lazy" src="' + esc(photoSrc(r.photo_url, 600)) + '" alt="" onerror="this.outerHTML=phHtmlGlobal(this)">' : phHtml(r.categorie)) +
         '<div class="cbody">' +
           '<div class="cat">' + esc(r.categorie || 'Sans catégorie') + '</div>' +
           '<h3>' + esc(r.titre) + '</h3>' +
@@ -362,6 +374,7 @@
         '<div class="photo-btns">' +
           '<span class="btn filebtn">📷 Choisir / prendre une photo<input type="file" id="f_file" accept="image/*"></span>' +
           '<input type="url" id="f_url" placeholder="… ou coller un lien (Drive ou image web)" value="' + esc(r.photo_url) + '">' +
+          '<button type="button" class="btn sm danger" id="f_delphoto"' + (r.photo_url ? '' : ' hidden') + '>🗑 Supprimer la photo</button>' +
           '<small id="f_pinfo">' + (r.photo_url ? 'Photo actuelle conservée.' : 'La photo est réduite (~300 Ko) avant l\'envoi.') + '</small>' +
         '</div></div></div>' +
       (r.id ? '<p class="src">Tes modifications ne seront visibles que par toi (« ma version »). Les autres continuent à voir la recette d\'origine.</p>' : '') +
@@ -385,13 +398,18 @@
       try {
         $('f_pinfo').textContent = 'Préparation de la photo…';
         pending = await reduirePhoto(f);
-        $('f_prev').src = pending.dataUrl; $('f_prev').hidden = false; $('f_url').value = '';
+        $('f_prev').src = pending.dataUrl; $('f_prev').hidden = false; $('f_url').value = ''; $('f_delphoto').hidden = false;
         $('f_pinfo').textContent = 'Photo prête (' + Math.round(pending.taille / 1024) + ' Ko), envoyée à l\'enregistrement.';
       } catch (err) { pending = null; $('f_pinfo').textContent = 'Photo illisible : ' + err.message; }
     });
     $('f_url').addEventListener('input', e => {
       const u = e.target.value.trim();
-      if (u) { pending = null; $('f_prev').src = photoSrc(u, 600); $('f_prev').hidden = false; }
+      if (u) { pending = null; $('f_prev').src = photoSrc(u, 600); $('f_prev').hidden = false; $('f_delphoto').hidden = false; }
+    });
+    $('f_delphoto').addEventListener('click', () => {
+      pending = null; $('f_url').value = ''; $('f_file').value = '';
+      $('f_prev').hidden = true; $('f_prev').removeAttribute('src'); $('f_delphoto').hidden = true;
+      $('f_pinfo').textContent = 'Photo retirée : elle disparaîtra à l\'enregistrement.';
     });
     $('form').addEventListener('submit', e => { e.preventDefault(); enregistrer(r); });
   }
@@ -536,7 +554,7 @@
         '<button class="btn" data-act="book">📖 Livre / impression PDF</button>' +
         '<button class="btn danger" data-act="logout">Se déconnecter</button>' +
         '<button class="btn" data-act="back">← Retour</button>' +
-      '</div></div>';
+      '</div><p class="src" style="margin-top:14px">Version de l\'appli : <b>' + APP_VERSION + '</b></p></div>';
   }
   async function renderUsers() {
     chrome(true, false);
@@ -626,7 +644,11 @@
   document.addEventListener('click', e => {
     const t = e.target;
     const chip = t.closest('.chip');
-    if (chip) { S.cat = chip.getAttribute('data-cat'); render(); return; }
+    if (chip) {
+      if (chip.hasAttribute('data-auteur')) S.auteur = chip.getAttribute('data-auteur');
+      else S.cat = chip.getAttribute('data-cat');
+      render(); return;
+    }
     const card = t.closest('.card');
     if (card) { S.id = card.getAttribute('data-id'); S.view = 'recipe'; render(); return; }
     const star = t.closest('[data-star]');
@@ -671,7 +693,6 @@
   $('q').addEventListener('input', e => { S.q = e.target.value; renderList(); });
   $('fMode').addEventListener('change', e => { S.mode = e.target.value; renderList(); });
   $('fStatut').addEventListener('change', e => { S.statut = e.target.value; renderList(); });
-  $('fAuteur').addEventListener('change', e => { S.auteur = e.target.value; renderList(); });
   function majReseau() { $('net').hidden = navigator.onLine; }
   window.addEventListener('online', majReseau); window.addEventListener('offline', majReseau);
 
@@ -703,6 +724,56 @@
       app.innerHTML = '<div class="msg err">Impossible de joindre le serveur.<br><small>' + esc(err.message) + '</small></div>';
     }
   }
+
+  // ---------- écran d'accueil animé (une fois par ouverture de l'appli) ----------
+  (function accueil() {
+    const sp = $('splash'), v = $('splashVid');
+    let vu = false; try { vu = sessionStorage.getItem('lr_splash') === '1'; } catch (e) { /* ignoré */ }
+    if (vu || !sp) return;
+    try { sessionStorage.setItem('lr_splash', '1'); } catch (e) { /* ignoré */ }
+    sp.hidden = false;
+    let fini = false;
+    const fermer = () => { if (fini) return; fini = true; sp.classList.add('out'); setTimeout(() => { sp.hidden = true; try { v.pause(); } catch (e) { /* ignoré */ } }, 700); };
+    sp.addEventListener('click', fermer);
+    v.addEventListener('ended', () => setTimeout(fermer, 600));
+    const p = v.play && v.play();
+    if (p && p.catch) p.catch(() => setTimeout(fermer, 3500));      // lecture automatique refusée : image fixe puis entrée
+    setTimeout(fermer, 9000);                                         // sécurité
+  })();
+
+  // ---------- aide à l'installation sur l'écran d'accueil ----------
+  (function aideInstallation() {
+    const box = $('install');
+    const standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    let off = false; try { off = localStorage.getItem('lr_install_off') === '1'; } catch (e) { /* ignoré */ }
+    if (standalone || off || !box) return;
+    const ua = navigator.userAgent || '';
+    const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    const android = /Android/.test(ua);
+    const inApp = /FBAN|FBAV|Instagram|GSA\/|Line\/|Outlook|; wv\)/.test(ua);
+    const close = '<button class="x" data-inst="off" aria-label="Fermer">×</button>';
+    let deferred = null;
+    const montrer = html => { box.innerHTML = '<div>' + html + '</div>' + close; box.hidden = false; };
+    if (ios) {
+      montrer(inApp
+        ? '📲 <b>Pour installer l\'appli</b>, ouvre d\'abord ce lien dans <b>Safari</b> (menu ⋯ ou ↗ « Ouvrir dans Safari »).'
+        : '📲 <b>Installer l\'appli sur l\'iPhone</b> : touche <b>Partager</b> <span class="ico">⬆︎</span> puis <b>« Sur l\'écran d\'accueil »</b>, puis ouvre l\'icône « Recettes » et connecte-toi dedans.' +
+          (/CriOS|FxiOS|EdgiOS/.test(ua) ? '<br><small>Pas de bouton Partager ? Ouvre la page dans Safari.</small>' : ''));
+    } else if (android) {
+      window.addEventListener('beforeinstallprompt', e => {
+        e.preventDefault(); deferred = e;
+        montrer('📲 <b>Installe l\'appli</b> sur ton téléphone pour l\'ouvrir comme une vraie application. <button class="btn sm primary" data-inst="go">Installer</button>');
+      });
+      setTimeout(() => { if (!deferred && box.hidden) montrer('📲 <b>Installer l\'appli</b> : menu <b>⋮</b> de Chrome puis <b>« Installer l\'application »</b> ou « Ajouter à l\'écran d\'accueil ».'); }, 4000);
+    }
+    box.addEventListener('click', async e => {
+      const b = e.target.closest('[data-inst]'); if (!b) return;
+      if (b.dataset.inst === 'go' && deferred) { deferred.prompt(); try { await deferred.userChoice; } catch (err) { /* ignoré */ } deferred = null; }
+      box.hidden = true;
+      if (b.dataset.inst === 'off') { try { localStorage.setItem('lr_install_off', '1'); } catch (err) { /* ignoré */ } }
+    });
+    window.addEventListener('appinstalled', () => { box.hidden = true; });
+  })();
 
   // Démarrage : affichage immédiat depuis le cache, puis mise à jour
   S.user = store.get('lr_user', null);

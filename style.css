@@ -177,6 +177,30 @@ form.edit h2,.panel h2{margin:0;font-size:22px}
 
 .myver{margin:0 0 12px;padding:8px 12px;border-radius:10px;background:#fff4d6;border:1px solid #e9c46a;font-size:.9rem}
 .tag.mine{background:#fff4d6;border-color:#e9c46a;color:#7a5a00}
+/* v5 : version, auteurs, illustration sans photo, aide installation, écran d'accueil */
+.ver{font-size:11px;font-weight:600;opacity:.6;margin-left:4px;letter-spacing:.02em}
+.chips.authors{margin-top:6px}
+.chips.authors .lbl{flex:none;align-self:center;font-size:13px;color:var(--muted,#7a746b);margin-right:2px}
+.chips.authors .chip{--c:#5b6b7a}
+.chips.authors .chip small{opacity:.7;font-size:11px}
+.ph{background:linear-gradient(135deg,color-mix(in srgb,var(--c) 88%,#fff),color-mix(in srgb,var(--c) 75%,#000))}
+.ph svg{width:72%;max-width:220px;height:auto}
+.install{display:flex;gap:10px;align-items:flex-start;margin:10px auto 0;max-width:1100px;padding:10px 14px;border-radius:12px;background:#eef6ff;border:1px solid #b9d6f2;font-size:14px;line-height:1.4}
+.install>div{flex:1}
+.install .x{border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:#456}
+.install .ico{display:inline-block;border:1px solid #9bb;border-radius:4px;padding:0 4px;font-size:12px}
+.install .btn{margin-left:6px}
+.splash{position:fixed;inset:0;z-index:9999;background:#1b1410;display:flex;align-items:center;justify-content:center;overflow:hidden;transition:opacity .7s ease}
+.splash.out{opacity:0;pointer-events:none}
+.splash video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.splash::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05) 40%,rgba(0,0,0,.65))}
+.splash-txt{position:absolute;left:0;right:0;bottom:16%;z-index:1;text-align:center;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6);font-family:Georgia,"Times New Roman",serif}
+.splash-txt span{display:block;opacity:0;transform:translateY(18px);animation:spIn .9s ease forwards}
+.splash-txt .s1{font-size:clamp(26px,7vw,46px);font-style:italic;animation-delay:.5s}
+.splash-txt .s2{font-size:clamp(30px,9vw,60px);font-weight:700;letter-spacing:.02em;animation-delay:1.3s}
+.splash-tap{position:absolute;bottom:5%;left:0;right:0;z-index:1;text-align:center;color:#fff;font-size:13px;opacity:0;animation:spIn .8s ease 2.6s forwards}
+@keyframes spIn{to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.splash-txt span,.splash-tap{animation:none;opacity:1;transform:none}}
 @media print{
   header.top,.book-tools,.no-print,.toast,.busy{display:none!important}
   body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}

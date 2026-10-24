@@ -1,6 +1,6 @@
 /* Service worker : appli disponible hors ligne + cache des photos.
  * Les données (recettes) sont gérées par app.js (cache local), pas ici. */
-const VERSION = 'lr-v7';
+const VERSION = 'lr-v8';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 const PHOTOS = 'lr-photos';
 
@@ -18,6 +18,9 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+
+  // Vidéo d'accueil : laissée au navigateur (requêtes partielles, indispensable sur iPhone)
+  if (url.pathname.endsWith('.mp4')) return;
 
   // API Apps Script : toujours le réseau (app.js gère le hors ligne)
   if (url.hostname.endsWith('script.google.com') || url.hostname.endsWith('googleusercontent.com') && url.pathname.indexOf('/macros/') >= 0) return;
