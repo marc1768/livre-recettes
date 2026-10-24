@@ -4,7 +4,9 @@
 (function () {
   'use strict';
 
-  const DEFAULT_API = 'https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec';
+  const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
+  // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
+  const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -27,6 +29,10 @@
   };
   const cfg = () => Object.assign({ url: DEFAULT_API, key: '', token: '' }, store.get('lr_cfg', {}));
   const setCfg = o => store.set('lr_cfg', Object.assign(cfg(), o));
+  (function migrerApi() {
+    const c = store.get('lr_cfg', {});
+    if (c.url && OLD_APIS.indexOf(c.url) >= 0) { c.url = DEFAULT_API; c.token = ''; store.set('lr_cfg', c); }
+  })();
   // Jeton : session longue (« Rester connecté ») dans localStorage, sinon session du navigateur seulement
   const ss = { get(k) { try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } }, set(k, v) { try { v ? sessionStorage.setItem(k, v) : sessionStorage.removeItem(k); } catch (e) { /* ignoré */ } } };
   const tok = () => ss.get('lr_tok') || cfg().token;
@@ -203,6 +209,7 @@
             (r.personnes ? '<span>👤 ' + esc(r.personnes) + '</span>' : '') + '</div>' +
           starsHtml(+r.note_moyenne || 0, +r.note_nb || 0) +
           '<div class="tags">' + split(r.modes_cuisson).map(m => '<span class="tag">' + esc(m) + '</span>').join('') + statusBadge(r.statut) +
+            (r.ma_version ? '<span class="tag mine">ma version</span>' : '') +
             (r.auteur ? '<span class="by">par ' + esc(r.auteur) + '</span>' : '') + '</div>' +
         '</div></div>';
     }).join('') + '</div>';
@@ -258,7 +265,11 @@
     const r = S.data.find(x => String(x.id) === String(S.id));
     if (!r) { S.view = 'list'; return render(); }
     app.innerHTML = '<div class="actions no-print"><button class="btn" data-act="back">← Retour</button>' +
-      (r.peut_modifier ? '<button class="btn" data-act="edit">✎ Modifier</button>' : '') + '</div>' + recipeHtml(r, true);
+      '<button class="btn" data-act="edit">✎ Modifier</button>' +
+      '<button class="btn" data-act="print">🖨 Imprimer</button>' +
+      (r.ma_version ? '<button class="btn" data-act="reset">↺ Revenir à l\'original</button>' : '') + '</div>' +
+      (r.ma_version ? '<div class="myver no-print">✎ Ma version — modifiée' + (r.ma_version_date ? ' le ' + esc(r.ma_version_date) : '') + '. Les autres voient la recette d\'origine.</div>' : '') +
+      recipeHtml(r, true);
     window.scrollTo(0, 0);
   }
 
@@ -305,7 +316,6 @@
   function renderForm() {
     chrome(true, false);
     const r = S.id ? (S.data.find(x => String(x.id) === String(S.id)) || {}) : {};
-    if (r.id && !r.peut_modifier) { toast('Tu ne peux modifier que tes propres fiches.', true); S.view = 'recipe'; return render(); }
     const L = listes();
     const modesSel = split(r.modes_cuisson);
     const mode = r.id ? modesSel : ['Air fryer'];
@@ -347,7 +357,8 @@
           '<input type="url" id="f_url" placeholder="… ou coller un lien (Drive ou image web)" value="' + esc(r.photo_url) + '">' +
           '<small id="f_pinfo">' + (r.photo_url ? 'Photo actuelle conservée.' : 'La photo est réduite (~300 Ko) avant l\'envoi.') + '</small>' +
         '</div></div></div>' +
-      '<div class="formbar">' + (r.id ? '<button type="button" class="btn danger left" data-act="delete">Supprimer</button>' : '') +
+      (r.id ? '<p class="src">Tes modifications ne seront visibles que par toi (« ma version »). Les autres continuent à voir la recette d\'origine.</p>' : '') +
+      '<div class="formbar">' + (r.id && r.peut_supprimer ? '<button type="button" class="btn danger left" data-act="delete">Supprimer pour tous</button>' : '') +
         '<button type="button" class="btn" data-act="cancel">Annuler</button>' +
         '<button type="submit" class="btn primary" id="f_save">Enregistrer</button></div>' +
       '</form>';
@@ -422,18 +433,29 @@
       if (pending) {
         busy(true, 'Envoi de la photo…');
         const url = (await api('photo', { id: saved.id, mime: 'image/jpeg', data: pending.dataUrl }, { essais: 1 })).url;
-        saved = (await api('save', { recette: { id: saved.id, photo_url: url } })).recette;
+        saved = (await api('save', { recette: { id: saved.id, photo_url: url, photo_initiale: !ancienne.id } })).recette;
       }
       const i = S.data.findIndex(x => String(x.id) === String(saved.id));
       const notes = i >= 0 ? { note_moyenne: S.data[i].note_moyenne, note_nb: S.data[i].note_nb, ma_note: S.data[i].ma_note } : { note_moyenne: 0, note_nb: 0, ma_note: 0 };
-      saved = Object.assign(saved, notes, { peut_modifier: true });
+      saved = Object.assign(saved, notes);
       if (i >= 0) S.data[i] = saved; else S.data.push(saved);
       saveCache();
-      toast('Recette ' + saved.id + ' enregistrée.');
+      toast(ancienne.id ? 'Ta version de la recette est enregistrée.' : 'Recette ' + saved.id + ' enregistrée.');
       S.id = saved.id; S.view = 'recipe'; render();
     } catch (err) {
       toast(err.message, true);
     } finally { S.busy = false; busy(false); }
+  }
+
+  async function revenirOriginal(btn) {
+    if (!btn.dataset.confirm) { btn.dataset.confirm = '1'; btn.textContent = 'Confirmer : effacer ma version'; setTimeout(() => { if (btn.isConnected) { delete btn.dataset.confirm; btn.textContent = '↺ Revenir à l\'original'; } }, 5000); return; }
+    S.busy = true; busy(true, 'Retour à l\'original…');
+    try {
+      const r0 = (await api('reset', { id: S.id }, { essais: 1 })).recette;
+      const i = S.data.findIndex(x => String(x.id) === String(S.id));
+      if (i >= 0) S.data[i] = Object.assign(r0, { note_moyenne: S.data[i].note_moyenne, note_nb: S.data[i].note_nb, ma_note: S.data[i].ma_note });
+      saveCache(); toast('Recette d\'origine rétablie.'); render();
+    } catch (e) { toast(e.message, true); } finally { S.busy = false; busy(false); }
   }
 
   async function supprimer(btn) {
@@ -618,6 +640,7 @@
     if (act === 'edit') { S.view = 'form'; render(); return; }
     if (act === 'cancel') { S.view = S.id && S.data.some(r => String(r.id) === String(S.id)) ? 'recipe' : 'list'; render(); return; }
     if (act === 'delete') { supprimer(actEl); return; }
+    if (act === 'reset') { revenirOriginal(actEl); return; }
     if (act === 'addstep') { editSteps.push({ label: 'Cuisson ' + (editSteps.length + 1), temp: 180, time: 10, time2: 0, rem: '' }); renderStepsEditor(); return; }
     if (act === 'print') { window.print(); return; }
     if (act === 'users') { S.view = 'users'; render(); return; }
