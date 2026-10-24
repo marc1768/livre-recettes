@@ -5,13 +5,13 @@
   'use strict';
 
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec';
-  const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro'];
-  const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue'];
+  const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
+  const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
   const DEFAULT_DEVICES = ['Severin FR 2462', 'Four traditionnel'];
   const CAT_STYLE = {
     'entree': ['#3d8b5a', '🥗'], 'potage': ['#d08a1e', '🍲'], 'soupe': ['#d08a1e', '🍲'], 'plat': ['#b5522b', '🍽️'],
-    'accompagnement': ['#7a8b2e', '🥔'], 'sauce': ['#8a4fa0', '🥣'], 'dessert': ['#d1477a', '🍰'], 'apero': ['#2f7ab5', '🥂']
+    'accompagnement': ['#7a8b2e', '🥔'], 'sauce': ['#8a4fa0', '🥣'], 'dessert': ['#d1477a', '🍰'], 'apero': ['#2f7ab5', '🥂'], 'boisson': ['#1d8f8f', '🍹']
   };
   const PHOTO_MAX = 1600, PHOTO_QUALITY = 0.8, TIMEOUT_MS = 60000;
 
