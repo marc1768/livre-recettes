@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.1';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.2';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -194,10 +194,9 @@
     $('fStatut').innerHTML = '<option value="">Tous les statuts</option>' + sts.map(s => '<option' + (S.statut === s ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
     const auteurs = []; S.data.forEach(r => { if (r.auteur && auteurs.indexOf(r.auteur) < 0) auteurs.push(r.auteur); });
     auteurs.sort((a, b) => a.localeCompare(b, 'fr'));
-    $('authors').innerHTML = '<span class="lbl">👤 Ajoutées par</span>' +
-      ['<button class="chip' + (S.auteur ? '' : ' on') + '" data-auteur="">Tout le monde</button>']
-      .concat(auteurs.map(a => '<button class="chip' + (S.auteur === a ? ' on' : '') + '" data-auteur="' + esc(a) + '">' + esc(a) +
-        ' <small>' + S.data.filter(r => r.auteur === a).length + '</small></button>')).join('');
+    if (S.auteur && auteurs.indexOf(S.auteur) < 0) S.auteur = '';
+    $('fAuteur').innerHTML = '<option value="">👤 Ajoutées par : tout le monde</option>' +
+      auteurs.map(a => '<option value="' + esc(a) + '"' + (S.auteur === a ? ' selected' : '') + '>👤 ' + esc(a) + ' (' + S.data.filter(r => r.auteur === a).length + ')</option>').join('');
   }
 
   window.phHtmlGlobal = img => phHtml(img.closest('.card') ? img.closest('.card').querySelector('.cat').textContent : '');
@@ -803,6 +802,7 @@
   $('q').addEventListener('input', e => { S.q = e.target.value; renderList(); });
   $('fMode').addEventListener('change', e => { S.mode = e.target.value; renderList(); });
   $('fStatut').addEventListener('change', e => { S.statut = e.target.value; renderList(); });
+  $('fAuteur').addEventListener('change', e => { S.auteur = e.target.value; renderList(); });
   function majReseau() { $('net').hidden = navigator.onLine; }
   window.addEventListener('online', () => synchroniser(true));
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') synchroniser(true); });
