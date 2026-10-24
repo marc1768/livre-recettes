@@ -34,7 +34,7 @@ header.top{position:sticky;top:0;z-index:5;background:rgba(251,246,238,.94);back
 .btn.sm{padding:4px 10px;font-size:13px}
 .btn:disabled{opacity:.55;cursor:default}
 .avatar{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;flex:none}
-@media (max-width:560px){ #btnBook{display:none} .brand h1{font-size:17px} .brand img{display:none} }
+@media (max-width:560px){ .brand h1{font-size:15px} .brand img{display:none} .bar{gap:6px} .bar .btn{padding:7px 10px} }
 
 .filters{max-width:980px;margin:0 auto;padding:0 16px 12px;display:flex;flex-direction:column;gap:10px}
 .search{width:100%;padding:10px 14px;border:1px solid var(--line);border-radius:999px;background:var(--card)}
@@ -156,6 +156,8 @@ form.edit h2,.panel h2{margin:0;font-size:22px}
 .urow b{flex:1;min-width:120px}
 .urow .off{color:var(--off);text-decoration:line-through}
 .menu{display:flex;flex-direction:column;gap:8px}
+.keep{display:flex;gap:8px;align-items:center;font-size:15px;cursor:pointer}
+.keep input{width:18px;height:18px;accent-color:var(--accent)}
 .menu .btn{text-align:left}
 
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;z-index:20;max-width:90vw;box-shadow:0 4px 18px rgba(0,0,0,.2)}

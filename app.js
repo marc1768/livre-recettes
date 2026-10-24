@@ -27,6 +27,9 @@
   };
   const cfg = () => Object.assign({ url: DEFAULT_API, key: '', token: '' }, store.get('lr_cfg', {}));
   const setCfg = o => store.set('lr_cfg', Object.assign(cfg(), o));
+  // Jeton : session longue (« Rester connecté ») dans localStorage, sinon session du navigateur seulement
+  const ss = { get(k) { try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } }, set(k, v) { try { v ? sessionStorage.setItem(k, v) : sessionStorage.removeItem(k); } catch (e) { /* ignoré */ } } };
+  const tok = () => ss.get('lr_tok') || cfg().token;
 
   // Lien d'installation : #setup=<URL API>|<clé d'installation>
   (function setupFromHash() {
@@ -117,7 +120,7 @@
     opts = opts || {};
     const c = cfg();
     if (!navigator.onLine) throw new Error('Pas de connexion internet.');
-    const payload = JSON.stringify(Object.assign({ action: action, token: c.token }, body || {}));
+    const payload = JSON.stringify(Object.assign({ action: action, token: tok() }, body || {}));
     let last;
     for (let essai = 1; essai <= (opts.essais || 2); essai++) {
       const ctl = new AbortController();
@@ -447,14 +450,17 @@
   function renderLogin(msg) {
     chrome(false, false);
     app.innerHTML = '<form class="panel narrow" id="lform"><h2>Connexion</h2>' + (msg ? '<p class="src">' + esc(msg) + '</p>' : '') +
-      '<div class="field"><label for="l_nom">Nom</label><input type="text" id="l_nom" autocomplete="username" required></div>' +
+      '<div class="field"><label for="l_nom">Nom</label><input type="text" id="l_nom" autocomplete="username" required value="' + esc(store.get('lr_nom', '')) + '"></div>' +
       '<div class="field"><label for="l_mdp">Mot de passe</label><input type="password" id="l_mdp" autocomplete="current-password" required></div>' +
+      '<label class="keep"><input type="checkbox" id="l_keep" checked> Rester connecté sur cet appareil</label>' +
       '<div class="formbar"><button type="submit" class="btn primary">Se connecter</button></div></form>';
     $('lform').addEventListener('submit', async e => {
       e.preventDefault(); busy(true, 'Connexion…');
       try {
-        const j = await api('login', { nom: $('l_nom').value.trim(), mdp: $('l_mdp').value }, { essais: 1 });
-        connecte(j);
+        const rester = $('l_keep').checked;
+        const j = await api('login', { nom: $('l_nom').value.trim(), mdp: $('l_mdp').value, rester: rester }, { essais: 1 });
+        store.set('lr_nom', $('l_nom').value.trim());
+        connecte(j, rester);
       } catch (err) { toast(err.message, true); } finally { busy(false); }
     });
   }
@@ -532,14 +538,15 @@
     } catch (err) { $('ulist').innerHTML = '<div class="msg err">' + esc(err.message) + '</div>'; }
   }
 
-  function connecte(j) {
-    setCfg({ token: j.token });
+  function connecte(j, rester) {
+    if (rester === false) { ss.set('lr_tok', j.token); setCfg({ token: '' }); }
+    else { ss.set('lr_tok', ''); setCfg({ token: j.token }); }
     S.user = j.user; store.set('lr_user', S.user);
     if (S.user.doit_changer) { S.view = 'password'; renderPassword(true); return; }
     S.view = 'list'; load(true);
   }
   function deconnecter(silencieux) {
-    setCfg({ token: '' }); store.del('lr_user'); store.del('lr_cache');
+    setCfg({ token: '' }); ss.set('lr_tok', ''); store.del('lr_user'); store.del('lr_cache');
     S.user = null; S.data = [];
     if (!silencieux) renderLogin('Déconnecté.');
     else setTimeout(() => renderLogin('Session terminée : reconnecte-toi.'), 0);
@@ -634,17 +641,18 @@
   // ---------- chargement ----------
   function saveCache() { store.set('lr_cache', { recettes: S.data, listes: S.listes, maj: S.maj }); }
   async function load(force) {
-    if (!cfg().token) return demarrerSansSession();
+    if (!tok()) return demarrerSansSession();
     if (force) toast('Mise à jour…');
     try {
       const d = await api('list');
       S.data = d.recettes || []; S.listes = d.listes || {}; S.maj = d.maj || '';
       S.user = d.user; store.set('lr_user', S.user);
+      if (d.token && cfg().token) setCfg({ token: d.token });     // session prolongée par le serveur
       saveCache();
       if (S.view !== 'form') render();
       if (force) toast(S.data.length + (S.data.length > 1 ? ' recettes chargées.' : ' recette chargée.'));
     } catch (err) {
-      if (!cfg().token) return;                     // session terminée : écran de connexion déjà affiché
+      if (!tok()) return;                           // session terminée : écran de connexion déjà affiché
       if (!S.data.length) app.innerHTML = '<div class="msg err">Impossible de charger les recettes.<br><small>' + esc(err.message) + '</small></div>';
       toast((navigator.onLine ? '' : 'Hors ligne : ') + err.message + (S.data.length ? ' — affichage de la dernière version.' : ''), true);
     }
@@ -662,7 +670,7 @@
   // Démarrage : affichage immédiat depuis le cache, puis mise à jour
   S.user = store.get('lr_user', null);
   const cache = store.get('lr_cache', null);
-  if (S.user && cfg().token && cache && cache.recettes) { S.data = cache.recettes; S.listes = cache.listes || {}; S.maj = cache.maj || ''; render(); }
+  if (S.user && tok() && cache && cache.recettes) { S.data = cache.recettes; S.listes = cache.listes || {}; S.maj = cache.maj || ''; render(); }
   majReseau();
   load(false);
 
