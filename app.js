@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.0';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.1';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -19,6 +19,7 @@
   const PHOTO_MAX = 1600, PHOTO_QUALITY = 0.8, TIMEOUT_MS = 60000;
 
   const S = { data: [], listes: {}, maj: '', user: null, cat: '', q: '', mode: '', statut: '', auteur: '', view: 'list', id: null, busy: false };
+  let syncEnCours = false;                       // envoi de la file en cours
   const $ = id => document.getElementById(id);
   const app = $('app');
 
@@ -202,6 +203,7 @@
   window.phHtmlGlobal = img => phHtml(img.closest('.card') ? img.closest('.card').querySelector('.cat').textContent : '');
   function chrome(loggedIn, withFilters) {
     ['btnReload', 'btnBook', 'btnNew', 'btnMe'].forEach(id => { $(id).hidden = !loggedIn; });
+    majSync();
     if (loggedIn && S.user) $('btnMe').textContent = S.user.nom.charAt(0).toUpperCase();
     $('ver').textContent = APP_VERSION;
     $('filters').style.display = withFilters ? '' : 'none';
@@ -287,6 +289,7 @@
       '<button class="btn" data-act="edit">✎ Modifier</button>' +
       '<button class="btn" data-act="print">🖨 Imprimer</button>' +
       (r.ma_version ? '<button class="btn" data-act="reset">↺ Revenir à l\'original</button>' : '') + '</div>' +
+      (enAttente(r.id) ? '<div class="pend no-print">⏳ Enregistrée sur le téléphone — envoi au retour à la liste ou avec le bouton ⬆.</div>' : '') +
       (r.ma_version ? '<div class="myver no-print">✎ Ma version — modifiée' + (r.ma_version_date ? ' le ' + esc(r.ma_version_date) : '') + '. Les autres voient la recette d\'origine.</div>' : '') +
       recipeHtml(r, true);
     window.scrollTo(0, 0);
@@ -296,16 +299,19 @@
     const r = S.data.find(x => String(x.id) === String(S.id));
     if (!r) return;
     const val = (+r.ma_note === n) ? 0 : n;                  // re-toucher la même étoile = retirer sa note
+    if (String(r.id).indexOf('TMP') === 0) { toast('Note possible après l\'envoi de la recette.', true); return; }
+    const avant = { ma_note: r.ma_note, note_moyenne: r.note_moyenne, note_nb: r.note_nb };
+    r.ma_note = val; renderRecipe();                          // affichage immédiat
+    toast(val ? 'Note : ' + val + '/5' : 'Note retirée');
     try {
       const j = await api('rate', { id: r.id, note: val });
       r.ma_note = j.ma_note; r.note_moyenne = j.moyenne; r.note_nb = j.nb;
-      saveCache(); renderRecipe();
-      toast(val ? 'Note enregistrée : ' + val + '/5' : 'Note retirée');
-    } catch (e) { toast(e.message, true); }
+      saveCache(); if (S.view === 'recipe' && String(S.id) === String(r.id)) renderRecipe();
+    } catch (e) { Object.assign(r, avant); if (S.view === 'recipe') renderRecipe(); toast('Note non enregistrée : ' + e.message, true); }
   }
 
   // ---------- vue : formulaire recette ----------
-  let pending = null, editSteps = [], editDevice = '';
+  let pending = null, photoSuppr = false, editSteps = [], editDevice = '';
   function stepperHtml(kind, i, v) {
     const txt = kind === 'temp' ? (v ? v + ' °C' : '— °C') : (v ? v + ' min' : '— min');
     return '<div class="stepper"><button type="button" data-step="' + kind + '" data-i="' + i + '" data-d="-1" aria-label="moins">−</button><span>' + txt +
@@ -344,7 +350,7 @@
     editDevice = pr.device || L.appareils[0];
     editSteps = pr.steps.length ? pr.steps : [{ label: 'Cuisson', temp: 180, time: 12, time2: 0, rem: '' }];
     const devs = L.appareils.slice(); if (devs.indexOf(editDevice) < 0) devs.push(editDevice);
-    pending = null;
+    pending = null; photoSuppr = false;
     app.innerHTML =
       '<form class="edit" id="form" autocomplete="off" style="' + cvar(r.categorie || 'Plat') + '">' +
       '<h2>' + (r.id ? 'Modifier ' + esc(r.id) : 'Nouvelle recette') + '</h2>' +
@@ -373,7 +379,7 @@
         '<img id="f_prev" alt="" src="' + esc(r.photo_url ? photoSrc(r.photo_url, 600) : '') + '"' + (r.photo_url ? '' : ' hidden') + '>' +
         '<div class="photo-btns">' +
           '<span class="btn filebtn">📷 Choisir / prendre une photo<input type="file" id="f_file" accept="image/*"></span>' +
-          '<input type="url" id="f_url" placeholder="… ou coller un lien (Drive ou image web)" value="' + esc(r.photo_url) + '">' +
+          '<input type="url" id="f_url" placeholder="… ou coller un lien (Drive ou image web)" value="' + esc(/^data:/.test(r.photo_url || '') ? '' : r.photo_url) + '">' +
           '<button type="button" class="btn sm danger" id="f_delphoto"' + (r.photo_url ? '' : ' hidden') + '>🗑 Supprimer la photo</button>' +
           '<small id="f_pinfo">' + (r.photo_url ? 'Photo actuelle conservée.' : 'La photo est réduite (~300 Ko) avant l\'envoi.') + '</small>' +
         '</div></div></div>' +
@@ -404,10 +410,10 @@
     });
     $('f_url').addEventListener('input', e => {
       const u = e.target.value.trim();
-      if (u) { pending = null; $('f_prev').src = photoSrc(u, 600); $('f_prev').hidden = false; $('f_delphoto').hidden = false; }
+      if (u) { pending = null; photoSuppr = false; $('f_prev').src = photoSrc(u, 600); $('f_prev').hidden = false; $('f_delphoto').hidden = false; }
     });
     $('f_delphoto').addEventListener('click', () => {
-      pending = null; $('f_url').value = ''; $('f_file').value = '';
+      pending = null; photoSuppr = true; $('f_url').value = ''; $('f_file').value = '';
       $('f_prev').hidden = true; $('f_prev').removeAttribute('src'); $('f_delphoto').hidden = true;
       $('f_pinfo').textContent = 'Photo retirée : elle disparaîtra à l\'enregistrement.';
     });
@@ -432,8 +438,24 @@
     });
   }
 
-  async function enregistrer(ancienne) {
-    if (S.busy) return;
+  // ---------- enregistrement local immédiat + file d'envoi (outbox) ----------
+  // Chaque modification est appliquée tout de suite sur le téléphone (cache local),
+  // puis envoyée au serveur Google au retour à la liste, avec le bouton ⬆, au retour du réseau
+  // ou quand l'appli passe en arrière-plan.
+  const outbox = () => store.get('lr_outbox', []);
+  const setOutbox = q => { store.set('lr_outbox', q); majSync(); };
+  const mesEnvois = () => outbox().filter(it => S.user && it.user === S.user.nom);
+  const enAttente = id => mesEnvois().some(it => String(it.id) === String(id));
+  function majSync() {
+    const b = $('btnSync'); if (!b) return;
+    const n = mesEnvois().length;
+    b.hidden = !n || !S.user;
+    b.classList.toggle('spin', syncEnCours);
+    b.textContent = (syncEnCours ? '⟳ ' : '⬆ ') + n;
+    b.title = n + ' modification(s) à envoyer — toucher pour envoyer maintenant';
+  }
+
+  function enregistrer(ancienne) {
     const modes = Array.from(document.querySelectorAll('input[name=mode]:checked')).map(x => x.value);
     const rec = {
       titre: $('f_titre').value.trim(),
@@ -446,35 +468,116 @@
       reglages_appareil: serializeRegs(editDevice, editSteps),
       statut: $('f_st').value,
       sources: $('f_src').value.split(/\s*;\s*/).filter(Boolean).join('\n'),
-      notes_marc: $('f_notes').value.trim(),
-      photo_url: pending ? (ancienne.photo_url || '') : $('f_url').value.trim()
+      notes_marc: $('f_notes').value.trim()
     };
-    if (ancienne.id) rec.id = ancienne.id;
     if (!rec.titre) { toast('Le titre est obligatoire.', true); return; }
-    S.busy = true; busy(true, 'Enregistrement…');
+    // photo : nouvelle (à envoyer), supprimée, lien collé, ou inchangée
+    let photo = null, local = '';
+    const lien = $('f_url').value.trim();
+    if (pending) { photo = pending.dataUrl; local = photo; }
+    else if (photoSuppr) rec.photo_url = '';
+    else if (lien) rec.photo_url = lien;
+    else if (/^data:/.test(ancienne.photo_url || '')) photo = 'garder';
+    else rec.photo_url = '';
+
+    const creation = !ancienne.id;
+    const id = creation ? 'TMP' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) : ancienne.id;
+    const q = outbox();
+    let it = q.find(x => String(x.id) === String(id) && !x.enCours && x.user === S.user.nom);
+    if (it) Object.assign(it.rec, rec);
+    else {
+      it = { qid: Date.now().toString(36) + Math.random().toString(36).slice(2), user: S.user.nom, id: id, rec: rec, photo: null,
+        creation: creation || String(id).indexOf('TMP') === 0 && !q.some(x => String(x.id) === String(id)),
+        nonce: Date.now().toString(36) + Math.random().toString(36).slice(2) };
+      q.push(it);
+    }
+    if (photo && photo !== 'garder') it.photo = photo;
+    else if (!photo && 'photo_url' in rec) it.photo = null;
+    setOutbox(q);
+
+    // copie locale affichée tout de suite
+    const today = new Date().toLocaleDateString('fr-BE');
+    const loc = Object.assign({}, ancienne, rec, { id: id });
+    if (local) loc.photo_url = local;
+    if (creation) Object.assign(loc, { auteur: S.user.nom, peut_modifier: true, peut_supprimer: true, note_moyenne: 0, note_nb: 0, ma_note: 0, date_ajout: today });
+    else if (String(id).indexOf('TMP') !== 0) Object.assign(loc, { ma_version: true, ma_version_date: today });
+    const i = S.data.findIndex(x => String(x.id) === String(id));
+    if (i >= 0) S.data[i] = loc; else S.data.push(loc);
+    saveCache();
+    toast('✓ Enregistré — envoi au retour à la liste');
+    S.id = id; S.view = 'recipe'; render();
+  }
+
+  // Remplace un identifiant provisoire (TMP…) par le vrai après création sur le serveur
+  function remplacerId(ancien, nouveau) {
+    if (String(ancien) === String(nouveau)) return;
+    const q = outbox(); q.forEach(x => { if (String(x.id) === String(ancien)) { x.id = nouveau; x.creation = false; } }); setOutbox(q);
+    S.data.forEach(r => { if (String(r.id) === String(ancien)) r.id = nouveau; });
+    if (String(S.id) === String(ancien)) S.id = nouveau;
+  }
+
+  async function synchroniser(silencieux) {
+    if (syncEnCours || !S.user || !tok()) return;
+    if (!mesEnvois().length) return;
+    if (!navigator.onLine) { if (!silencieux) toast('Hors ligne : les modifications restent sur le téléphone.', true); return; }
+    syncEnCours = true; majSync();
+    let ok = 0, err = null;
     try {
-      const nonce = ancienne.id ? undefined : (Date.now().toString(36) + Math.random().toString(36).slice(2));
-      let saved = (await api('save', { recette: rec, nonce: nonce })).recette;
-      if (pending) {
-        busy(true, 'Envoi de la photo…');
-        const url = (await api('photo', { id: saved.id, mime: 'image/jpeg', data: pending.dataUrl }, { essais: 1 })).url;
-        saved = (await api('save', { recette: { id: saved.id, photo_url: url, photo_initiale: !ancienne.id } })).recette;
+      for (;;) {
+        const q = outbox();
+        const it = q.find(x => x.user === S.user.nom);
+        if (!it) break;
+        it.enCours = true; setOutbox(q);
+        try {
+          if (it.creation) {
+            const rec = Object.assign({}, it.rec); delete rec.id;
+            const saved = (await api('save', { recette: rec, nonce: it.nonce })).recette;
+            const ancien = it.id;
+            const q2 = outbox(); const k = q2.find(x => x.qid === it.qid);
+            if (k) { k.id = saved.id; k.creation = false; k.photoInitiale = true; k.rec = {}; k.base = saved; }
+            setOutbox(q2);
+            remplacerId(ancien, saved.id);
+            Object.assign(it, k || {});
+          } else if (Object.keys(it.rec).length) {
+            const saved = (await api('save', { recette: Object.assign({}, it.rec, { id: it.id }) })).recette;
+            const q2 = outbox(); const k = q2.find(x => x.qid === it.qid);
+            if (k) { k.rec = {}; k.base = saved; } setOutbox(q2);
+            it.rec = {}; it.base = saved;
+          }
+          let saved = it.base;
+          if (it.photo) {
+            const url = (await api('photo', { id: it.id, mime: 'image/jpeg', data: it.photo }, { essais: 2 })).url;
+            saved = (await api('save', { recette: { id: it.id, photo_url: url, photo_initiale: !!it.photoInitiale } })).recette;
+          }
+          setOutbox(outbox().filter(x => x.qid !== it.qid));
+          // mise à jour de la copie locale avec la réponse du serveur (sauf si une autre modif attend encore)
+          if (saved && !enAttente(saved.id)) {
+            const i = S.data.findIndex(x => String(x.id) === String(saved.id));
+            const notes = i >= 0 ? { note_moyenne: S.data[i].note_moyenne, note_nb: S.data[i].note_nb, ma_note: S.data[i].ma_note } : { note_moyenne: 0, note_nb: 0, ma_note: 0 };
+            saved = Object.assign({}, saved, notes);
+            if (i >= 0) S.data[i] = saved; else S.data.push(saved);
+          }
+          saveCache(); ok++;
+        } catch (e) {
+          if (e.api) {                                   // refus définitif du serveur : on abandonne cette modification
+            setOutbox(outbox().filter(x => x.qid !== it.qid));
+            toast('Modification refusée par le serveur : ' + e.message, true);
+            continue;
+          }
+          const q3 = outbox(); const k = q3.find(x => x.qid === it.qid); if (k) delete k.enCours; setOutbox(q3);
+          err = e; break;
+        }
       }
-      const i = S.data.findIndex(x => String(x.id) === String(saved.id));
-      const notes = i >= 0 ? { note_moyenne: S.data[i].note_moyenne, note_nb: S.data[i].note_nb, ma_note: S.data[i].ma_note } : { note_moyenne: 0, note_nb: 0, ma_note: 0 };
-      saved = Object.assign(saved, notes);
-      if (i >= 0) S.data[i] = saved; else S.data.push(saved);
-      saveCache();
-      toast(ancienne.id ? 'Ta version de la recette est enregistrée.' : 'Recette ' + saved.id + ' enregistrée.');
-      S.id = saved.id; S.view = 'recipe'; render();
-    } catch (err) {
-      toast(err.message, true);
-    } finally { S.busy = false; busy(false); }
+    } finally { syncEnCours = false; majSync(); }
+    if (S.view === 'list' || S.view === 'recipe') render();
+    if (err) { if (!silencieux) toast('Envoi impossible pour l\'instant (' + err.message + '). Les modifications restent sur le téléphone.', true); }
+    else if (ok && !silencieux) toast('✓ ' + ok + (ok > 1 ? ' modifications envoyées' : ' modification envoyée'));
   }
 
   async function revenirOriginal(btn) {
     if (!btn.dataset.confirm) { btn.dataset.confirm = '1'; btn.textContent = 'Confirmer : effacer ma version'; setTimeout(() => { if (btn.isConnected) { delete btn.dataset.confirm; btn.textContent = '↺ Revenir à l\'original'; } }, 5000); return; }
     S.busy = true; busy(true, 'Retour à l\'original…');
+    setOutbox(outbox().filter(x => !(String(x.id) === String(S.id) && !x.enCours)));
     try {
       const r0 = (await api('reset', { id: S.id }, { essais: 1 })).recette;
       const i = S.data.findIndex(x => String(x.id) === String(S.id));
@@ -485,7 +588,13 @@
 
   async function supprimer(btn) {
     if (!btn.dataset.confirm) { btn.dataset.confirm = '1'; btn.textContent = 'Confirmer la suppression'; setTimeout(() => { if (btn.isConnected) { delete btn.dataset.confirm; btn.textContent = 'Supprimer'; } }, 5000); return; }
+    if (String(S.id).indexOf('TMP') === 0) {              // pas encore envoyée : suppression locale seulement
+      setOutbox(outbox().filter(x => String(x.id) !== String(S.id)));
+      S.data = S.data.filter(x => String(x.id) !== String(S.id)); saveCache();
+      toast('Recette supprimée.'); S.id = null; S.view = 'list'; render(); return;
+    }
     S.busy = true; busy(true, 'Suppression…');
+    setOutbox(outbox().filter(x => !(String(x.id) === String(S.id) && !x.enCours)));
     try {
       await api('delete', { id: S.id }, { essais: 1 });
       S.data = S.data.filter(x => String(x.id) !== String(S.id)); saveCache();
@@ -672,7 +781,7 @@
     }
     const actEl = t.closest('[data-act]');
     const act = actEl && actEl.getAttribute('data-act');
-    if (act === 'back') { S.view = 'list'; render(); return; }
+    if (act === 'back') { S.view = 'list'; render(); synchroniser(false); return; }
     if (act === 'edit') { S.view = 'form'; render(); return; }
     if (act === 'cancel') { S.view = S.id && S.data.some(r => String(r.id) === String(S.id)) ? 'recipe' : 'list'; render(); return; }
     if (act === 'delete') { supprimer(actEl); return; }
@@ -688,12 +797,15 @@
     if (t.id === 'btnNew') { S.id = null; S.view = 'form'; render(); return; }
     if (t.id === 'btnMe') { S.view = 'me'; render(); return; }
     if (t.id === 'btnReload') { load(true); return; }
+    if (t.id === 'btnSync') { synchroniser(false); return; }
     if (t.matches('ul.ing input')) t.parentNode.classList.toggle('done', t.checked);
   });
   $('q').addEventListener('input', e => { S.q = e.target.value; renderList(); });
   $('fMode').addEventListener('change', e => { S.mode = e.target.value; renderList(); });
   $('fStatut').addEventListener('change', e => { S.statut = e.target.value; renderList(); });
   function majReseau() { $('net').hidden = navigator.onLine; }
+  window.addEventListener('online', () => synchroniser(true));
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') synchroniser(true); });
   window.addEventListener('online', majReseau); window.addEventListener('offline', majReseau);
 
   // ---------- chargement ----------
@@ -703,7 +815,9 @@
     if (force) toast('Mise à jour…');
     try {
       const d = await api('list', force ? { frais: true } : {});
-      S.data = d.recettes || []; S.listes = d.listes || {}; S.maj = d.maj || '';
+      const locales = S.data.filter(r => enAttente(r.id));
+      S.data = d.recettes || [];
+      locales.forEach(l => { const i = S.data.findIndex(x => String(x.id) === String(l.id)); if (i >= 0) S.data[i] = l; else S.data.push(l); }); S.listes = d.listes || {}; S.maj = d.maj || '';
       S.user = d.user; store.set('lr_user', S.user);
       if (d.token && cfg().token) setCfg({ token: d.token });     // session prolongée par le serveur
       saveCache();
@@ -779,8 +893,8 @@
   S.user = store.get('lr_user', null);
   const cache = store.get('lr_cache', null);
   if (S.user && tok() && cache && cache.recettes) { S.data = cache.recettes; S.listes = cache.listes || {}; S.maj = cache.maj || ''; render(); }
-  majReseau();
-  load(false);
+  majReseau(); majSync();
+  load(false).then(() => synchroniser(true));
 
   if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 })();
