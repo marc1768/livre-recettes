@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.7';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.7.1';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -861,7 +861,7 @@
     try {
       const t = await obtenirJetonPush();
       if (!t) throw new Error('aucun jeton reçu');
-      await api('push_token', { token: t, appareil: nomAppareil() }, { essais: 1 });
+      await api('push_token', { jeton_push: t, appareil: nomAppareil() }, { essais: 1 });
       store.set('lr_push_token', t);
       toast('🔔 Notifications activées.');
     } catch (e) { toast('Activation impossible : ' + e.message, true); }
@@ -875,7 +875,7 @@
     if (!pushPossible() || Notification.permission !== 'granted' || !S.user || ss.get('lr_push_ok')) return;
     try {
       const t = await obtenirJetonPush();
-      if (t && t !== store.get('lr_push_token', '')) { await api('push_token', { token: t, appareil: nomAppareil() }, { essais: 1 }); store.set('lr_push_token', t); }
+      if (t && t !== store.get('lr_push_token', '')) { await api('push_token', { jeton_push: t, appareil: nomAppareil() }, { essais: 1 }); store.set('lr_push_token', t); }
       ss.set('lr_push_ok', '1');
     } catch (e) { /* réessai à la prochaine ouverture */ }
   }
