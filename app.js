@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.13';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.14';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -353,7 +353,7 @@
 
   // ---------- vue : formulaire recette ----------
   const H = id => ' <button type="button" class="hbtn" data-help="' + id + '" aria-label="Aide">?</button>';
-  let editPhotos = [], editSteps = [], editDevice = '';     // editPhotos : [{url}] déjà en ligne ou [{data}] à envoyer
+  let editPhotos = [], editSteps = [], editDevice = '', principaleBloquee = false, nVerrou = 0;     // editPhotos : [{url}] déjà en ligne ou [{data}] à envoyer
   function stepperHtml(kind, i, v) {
     const txt = kind === 'temp' ? (v ? v + ' °C' : '— °C') : (v ? v + ' min' : '— min');
     return '<div class="stepper"><button type="button" data-step="' + kind + '" data-i="' + i + '" data-d="-1" aria-label="moins">−</button><span>' + txt +
@@ -394,6 +394,9 @@
     editSteps = pr.steps.length ? pr.steps : [{ label: 'Cuisson', temp: 180, time: 12, time2: 0, rem: '' }];
     const devs = L.appareils.slice(); if (devs.indexOf(editDevice) < 0) devs.push(editDevice);
     editPhotos = imp ? (imp.photos || []).slice(0, MAX_PHOTOS).map(photoItem) : photosDe(r).map(photoItem);
+    // photo principale : seul le créateur de la recette peut la changer (pour tout le monde)
+    principaleBloquee = !!(r.id && r.peut_photo === false && editPhotos.length);
+    nVerrou = principaleBloquee ? Math.min(editPhotos.length, r.photos_origine > 0 ? r.photos_origine : 1) : 0;   // photos du créateur : intouchables
     const auteurs = []; S.data.forEach(x => { if (x.auteur && auteurs.indexOf(x.auteur) < 0) auteurs.push(x.auteur); });
     const doublon = imp && S.data.find(x => norm(x.titre) === norm(imp.titre));
     app.innerHTML =
@@ -433,7 +436,8 @@
           '<div class="urlrow"><input type="url" id="f_url" placeholder="… ou coller un lien (Drive ou image web)"><button type="button" class="btn sm" id="f_addurl">Ajouter</button></div>' +
           '<small id="f_pinfo">La première photo est la photo principale. Les photos sont réduites (~300 Ko) avant l\'envoi.</small>' +
         '</div></div>' +
-      (r.id ? '<p class="src">Tes modifications ne seront visibles que par toi (« ma version »). Les autres continuent à voir la recette d\'origine.</p>' : '') +
+      (r.id ? (r.peut_photo ? '<p class="src">📷 Tu as créé cette recette : tes photos et la photo principale sont visibles par tout le monde. Tes autres modifications ne sont visibles que par toi (« ma version »).</p>'
+        : '<p class="src">Tes modifications ne seront visibles que par toi (« ma version »), y compris les photos que tu ajoutes.' + (principaleBloquee ? ' 🔒 La photo principale et les photos de ' + esc(r.auteur || 'la recette d\'origine') + ' ne peuvent être changées que par ' + esc(r.auteur || 'la personne qui a créé la recette') + '.' : '') + '</p>') : '') +
       (r.id && estAdmin() ? '<div class="delzone"><button type="button" class="btn danger" data-act="delete">🗑 Supprimer cette recette</button><small>' + H('supprimer') + ' Visible seulement sur ton compte administrateur. Supprime la recette pour tout le monde (avec les versions personnelles).</small></div>' : '') +
       '<div class="formbar">' +
         '<button type="button" class="btn" data-act="cancel">Annuler</button>' +
@@ -477,6 +481,7 @@
     });
     $('photosEd').addEventListener('click', e => {
       const b = e.target.closest('[data-pdel],[data-pmain]'); if (!b) return;
+      if (principaleBloquee && (b.dataset.pmain !== undefined || +b.dataset.pdel < nVerrou)) return;
       if (b.dataset.pdel !== undefined) editPhotos.splice(+b.dataset.pdel, 1);
       else { const p = editPhotos.splice(+b.dataset.pmain, 1)[0]; editPhotos.unshift(p); }
       renderPhotosEd();
@@ -492,9 +497,10 @@
       const on = editPhotos.some(p => (p.url || p.data) === v);
       return '<button type="button" class="impt' + (on ? ' on' : '') + '" data-imp="' + i + '"><img src="' + esc(/^data:/.test(v) ? v : photoSrc(v, 300)) + '" alt=""><span>' + (on ? '✓' : '+') + '</span></button>';
     }).join('');
+    const verrou = principaleBloquee;
     box.innerHTML = editPhotos.length ? editPhotos.map((p, i) => '<div class="pth' + (i ? '' : ' main') + '"><img src="' + esc(p.data || photoSrc(p.url, 300)) + '" alt="">' +
-      (i ? '<button type="button" class="pmain" data-pmain="' + i + '" title="Mettre en photo principale">★</button>' : '<span class="ptag">Principale</span>') +
-      '<button type="button" class="pdel" data-pdel="' + i + '" aria-label="Retirer la photo">✕</button></div>').join('') : '<span class="src">Aucune photo : une casserole aux couleurs de la catégorie sera affichée.</span>';
+      (i ? (verrou ? (i < nVerrou ? '<span class="ptag">🔒</span>' : '') : '<button type="button" class="pmain" data-pmain="' + i + '" title="Mettre en photo principale">★</button>') : '<span class="ptag">' + (verrou ? '🔒 ' : '') + 'Principale</span>') +
+      (i >= nVerrou ? '<button type="button" class="pdel" data-pdel="' + i + '" aria-label="Retirer la photo">✕</button>' : '') + '</div>').join('') : '<span class="src">Aucune photo : une casserole aux couleurs de la catégorie sera affichée.</span>';
     const plein = editPhotos.length >= MAX_PHOTOS;
     $('f_addbtn').classList.toggle('disabled', plein); $('f_file').disabled = plein;
   }

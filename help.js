@@ -76,7 +76,8 @@
       '<p><b>📷 Ajouter des photos</b> : appareil photo ou galerie, plusieurs à la fois si tu veux, <b>5 maximum</b> par recette. Elles sont réduites (~300 Ko) avant l\'envoi.</p>' +
       '<p>Ou <b>colle un lien</b> (image web ou Google Drive) puis touche « Ajouter ».</p>' +
       '<p>La <b>première photo</b> (encadrée, « Principale ») s\'affiche sur la carte de la liste et en grand sur la fiche. <b>★</b> sur une autre photo la met en principale ; <b>✕</b> la retire.</p>' +
-      '<p>Sur la fiche, les autres photos apparaissent en vignettes sous la grande photo : touche une vignette pour l\'afficher en grand. Sans photo, une casserole aux couleurs de la catégorie s\'affiche.</p>' },
+      '<p>Sur la fiche, les autres photos apparaissent en vignettes sous la grande photo : touche une vignette pour l\'afficher en grand. Sans photo, une casserole aux couleurs de la catégorie s\'affiche.</p>' +
+      '<p><b>Qui change la photo principale ?</b> Seule la personne qui a <b>créé la recette</b> peut changer la photo principale, et le changement se voit <b>chez tout le monde</b> (ses autres photos aussi). Les autres peuvent ajouter des photos : elles restent dans leur « ma version » et la photo principale reste celle du créateur (🔒).</p>' },
     { id: 'enregistrer', titre: 'Enregistrer et envoi', html:
       '<p><b>Enregistrer</b> est immédiat : la recette est mise à jour sur le téléphone.</p>' +
       '<p>L\'envoi au serveur se fait au <b>retour à la liste</b>, avec le bouton orange <b>⬆</b>, au retour du réseau ou quand l\'appli passe en arrière-plan. Une fiche pas encore envoyée affiche « ⏳ Enregistrée sur le téléphone ». Hors ligne, rien n\'est perdu.</p>' },
