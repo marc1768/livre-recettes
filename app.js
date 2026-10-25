@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.12';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.13';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -399,6 +399,8 @@
     app.innerHTML =
       '<form class="edit" id="form" autocomplete="off" style="' + cvar(r.categorie || 'Plat') + '">' +
       '<h2>' + (r.id ? 'Modifier ' + esc(r.id) : imp ? 'Recette importée' : 'Nouvelle recette') + ' <button type="button" class="btn sm hlink" data-help="' + (imp ? 'importer' : 'titre') + '">❓ Aide</button></h2>' +
+      (!r.id && !imp ? '<div class="collebar"><button type="button" class="btn sm" data-act="collerclaude">📋 Coller une recette préparée par Claude</button>' + H('importer') +
+        '<div id="collebox" hidden><small>Colle ici ce que tu as copié dans l\'éditeur de Claude (appui long › Coller) :</small><textarea id="f_colle" rows="3"></textarea><button type="button" class="btn sm primary" data-act="collerok">Importer</button></div></div>' : '') +
       (imp ? '<div class="impbar"><b>📥 Préparée par Claude</b> : vérifie chaque case, change ce que tu veux, choisis les photos, puis <b>Enregistrer</b>. Rien n\'est ajouté au livre tant que tu n\'as pas enregistré.' +
         (doublon ? '<br><span class="impwarn">⚠ Une recette « ' + esc(doublon.titre) + ' » existe déjà dans le livre.</span>' : '') + '</div>' : '') +
       '<div class="field"><label for="f_titre">Titre *' + H('titre') + '</label><input type="text" id="f_titre" required value="' + esc(r.titre) + '"></div>' +
@@ -1078,6 +1080,22 @@
       sources: txt(o.sources), notes_marc: txt(o.notes || o.notes_marc), auteur: txt(o.auteur),
       photos: (Array.isArray(o.photos) ? o.photos : lines(o.photos)).filter(u => /^(https?:|data:image\/)/.test(u)).slice(0, 12) };
   }
+  function codeImport(t) {
+    t = String(t || '').trim();
+    const m = t.match(/#import=([\w-]+)/) || t.match(/^([\w-]{40,})$/);
+    return m ? m[1] : '';
+  }
+  function importerTexte(t) {
+    const raw = codeImport(t);
+    if (!raw) { toast('Rien à importer : copie d\'abord la recette dans l\'éditeur de Claude.', true); return false; }
+    store.set('lr_import', { raw: raw, t: Date.now() }); ouvrirImport(); return true;
+  }
+  async function collerClaude() {
+    let t = '';
+    try { t = await navigator.clipboard.readText(); } catch (e) { t = ''; }
+    if (codeImport(t)) { importerTexte(t); return; }
+    const box = $('collebox'); if (box) { box.hidden = false; $('f_colle').focus(); }
+  }
   async function ouvrirImport() {
     if (!S.user || S.user.doit_changer) return;
     const p = store.get('lr_import', null); if (!p || !p.raw) return;
@@ -1169,6 +1187,8 @@
     if (act === 'ntest') { testerNotifications(false); return; }
     if (act === 'ntestd') { testerNotifications(true); return; }
     if (act === 'edit') { S.view = 'form'; render(); return; }
+    if (act === 'collerclaude') { collerClaude(); return; }
+    if (act === 'collerok') { importerTexte($('f_colle') && $('f_colle').value); return; }
     if (act === 'cancel') { S.draft = null; S.view = S.id && S.data.some(r => String(r.id) === String(S.id)) ? 'recipe' : 'list'; render(); return; }
     if (act === 'delete') { supprimer(actEl); return; }
     if (act === 'reset') { revenirOriginal(actEl); return; }

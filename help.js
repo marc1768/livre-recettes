@@ -81,8 +81,9 @@
       '<p><b>Enregistrer</b> est immédiat : la recette est mise à jour sur le téléphone.</p>' +
       '<p>L\'envoi au serveur se fait au <b>retour à la liste</b>, avec le bouton orange <b>⬆</b>, au retour du réseau ou quand l\'appli passe en arrière-plan. Une fiche pas encore envoyée affiche « ⏳ Enregistrée sur le téléphone ». Hors ligne, rien n\'est perdu.</p>' },
     { id: 'importer', titre: 'Importer une recette avec Claude (/recette)', html:
-      '<p>Dans une conversation Claude, tape <b>/recette</b> et donne une <b>photo</b> (livre, carnet, écran), un <b>PDF</b> ou le <b>lien</b> d\'une recette en ligne. Claude lit tout, te montre un tableau à corriger, puis te donne un lien <b>« Ouvrir dans le livre »</b>.</p>' +
-      '<p>Le lien ouvre ce formulaire <b>déjà rempli</b>, avec un bandeau jaune « Préparée par Claude ». Vérifie chaque case et modifie ce que tu veux. <b>Rien n\'est ajouté au livre tant que tu n\'as pas touché Enregistrer.</b></p>' +
+      '<p>Dans une conversation Claude, tape <b>/recette</b> et donne une <b>photo</b> (livre, carnet, écran), un <b>PDF</b> ou le <b>lien</b> d\'une recette en ligne. Claude lit tout et t\'affiche un <b>éditeur</b> pour corriger la recette et ajouter tes photos.</p>' +
+      '<p>Dans l\'éditeur, touche <b>Valider la recette</b>, puis <b>📋 Copier pour le livre</b>. Ici, touche <b>+ Recette</b>, puis <b>📋 Coller une recette préparée par Claude</b>. Si le téléphone ne colle pas tout seul, une case s\'ouvre : appui long, Coller, puis <b>Importer</b>. Sans photo de ton appareil, le bouton <b>Ouvrir dans le livre</b> de l\'éditeur marche aussi.</p>' +
+      '<p>Le formulaire s\'ouvre <b>déjà rempli</b>, avec un bandeau jaune « Préparée par Claude ». Vérifie chaque case et modifie ce que tu veux. <b>Rien n\'est ajouté au livre tant que tu n\'as pas touché Enregistrer.</b></p>' +
       '<p><b>Photos trouvées par Claude</b> : touche une vignette pour l\'ajouter (✓) ou la retirer (+). 5 photos au maximum.</p>' +
       '<p><b>Auteur</b> (compte administrateur seulement) : le nom affiché sur la fiche, par exemple « Severin » ou « Mamy ». Un message te prévient si une recette du même nom existe déjà.</p>' +
       '<p>Sur iPhone, le lien s\'ouvre dans Safari : connecte-toi une fois dans Safari aussi (« Rester connecté »).</p>' },

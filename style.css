@@ -330,3 +330,8 @@ img,video{max-width:100%}
 .impt span{position:absolute;right:4px;bottom:4px;width:24px;height:24px;border-radius:50%;background:#fff;color:#2b2a28;font-weight:800;font-size:15px;line-height:24px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .impt.on{border-color:#b5542a;opacity:1}
 .impt.on span{background:#b5542a;color:#fff}
+.collebar{margin:0 0 14px;display:grid;gap:8px}
+.collebar>button{justify-self:start}
+#collebox{display:grid;gap:6px}
+#collebox textarea{font-size:13px}
+#collebox button{justify-self:start}
