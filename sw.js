@@ -1,6 +1,6 @@
 /* Service worker : appli disponible hors ligne + cache des photos.
  * Les données (recettes) sont gérées par app.js (cache local), pas ici. */
-const VERSION = 'lr-v17';
+const VERSION = 'lr-v18';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'help.js', 'manifest.webmanifest', 'icons/icon-192.png?v=2', 'icons/icon-512.png?v=2'];
 const PHOTOS = 'lr-photos';
 
@@ -10,7 +10,7 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k !== VERSION && k !== PHOTOS).map(k => caches.delete(k))))
+    .then(keys => Promise.all(keys.filter(k => k !== VERSION && k !== PHOTOS && k !== 'lr-badge').map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
@@ -44,6 +44,16 @@ self.addEventListener('fetch', e => {
 });
 
 // ---------- notifications push (Firebase Cloud Messaging) ----------
+// Pastille chiffrée sur l'icône : compteur partagé avec l'appli (cache « lr-badge »), remis à zéro à l'ouverture des courses
+async function majBadge(ajout) {
+  try {
+    const c = await caches.open('lr-badge');
+    const r = await c.match('n');
+    const n = (r ? (parseInt(await r.text(), 10) || 0) : 0) + ajout;
+    await c.put('n', new Response(String(n)));
+    if (self.navigator && self.navigator.setAppBadge) await self.navigator.setAppBadge(n);
+  } catch (e) { /* non pris en charge */ }
+}
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (x) { d = { data: { body: e.data ? e.data.text() : '' } }; }
@@ -51,7 +61,7 @@ self.addEventListener('push', e => {
   e.waitUntil(self.registration.showNotification(m.title || 'Livre de recettes', {
     body: m.body || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png',
     tag: 'courses', renotify: true, data: { vue: m.vue || 'courses' }
-  }).then(() => { if (self.navigator && self.navigator.setAppBadge) return self.navigator.setAppBadge().catch(() => {}); }));
+  }).then(() => majBadge(+(m.n || 1))));
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();

@@ -72,9 +72,11 @@
       '<p><b>Statut</b> : À tester, Testée… (sert de filtre).</p>' +
       '<p><b>Sources</b> : livre, site, personne… Sépare-les par « ; ». Les liens web deviennent cliquables sur la fiche.</p>' +
       '<p><b>Notes</b> : réglages réellement utilisés, ajustements, idées.</p>' },
-    { id: 'photo', titre: 'Photo', html:
-      '<p><b>📷 Choisir / prendre une photo</b> : appareil photo ou galerie ; elle est réduite (~300 Ko) avant l\'envoi.</p>' +
-      '<p>Ou <b>colle un lien</b> (image web ou Google Drive). <b>🗑 Supprimer la photo</b> la retire ; sans photo, une casserole aux couleurs de la catégorie s\'affiche.</p>' },
+    { id: 'photo', titre: 'Photos (jusqu\'à 5)', html:
+      '<p><b>📷 Ajouter des photos</b> : appareil photo ou galerie, plusieurs à la fois si tu veux, <b>5 maximum</b> par recette. Elles sont réduites (~300 Ko) avant l\'envoi.</p>' +
+      '<p>Ou <b>colle un lien</b> (image web ou Google Drive) puis touche « Ajouter ».</p>' +
+      '<p>La <b>première photo</b> (encadrée, « Principale ») s\'affiche sur la carte de la liste et en grand sur la fiche. <b>★</b> sur une autre photo la met en principale ; <b>✕</b> la retire.</p>' +
+      '<p>Sur la fiche, les autres photos apparaissent en vignettes sous la grande photo : touche une vignette pour l\'afficher en grand. Sans photo, une casserole aux couleurs de la catégorie s\'affiche.</p>' },
     { id: 'enregistrer', titre: 'Enregistrer et envoi', html:
       '<p><b>Enregistrer</b> est immédiat : la recette est mise à jour sur le téléphone.</p>' +
       '<p>L\'envoi au serveur se fait au <b>retour à la liste</b>, avec le bouton orange <b>⬆</b>, au retour du réseau ou quand l\'appli passe en arrière-plan. Une fiche pas encore envoyée affiche « ⏳ Enregistrée sur le téléphone ». Hors ligne, rien n\'est perdu.</p>' },
@@ -93,7 +95,7 @@
     { id: 'partage', titre: 'Partager la liste de courses', html:
       '<p><b>👥 Partager ma liste</b> : coche les personnes de la famille. Elles voient ta liste et peuvent la <b>modifier</b> (ajouter, cocher, supprimer). Tu ne vois la liste de quelqu\'un que s\'il l\'a partagée avec toi.</p>' +
       '<p><b>Nouveautés</b> : quand quelqu\'un ajoute des articles à une liste que tu vois, une <b>pastille rouge</b> avec leur nombre apparaît sur 🛒 et ces lignes sont encadrées en rouge. La pastille disparaît dès que tu ouvres les courses. L\'appli vérifie toutes les 2 minutes quand elle est ouverte, et à chaque retour dans l\'appli.</p>' +
-      '<p><b>Pastille sur l\'icône de l\'appli</b> (iPhone iOS 16.4 ou plus, appli installée) : touche « 🔔 Afficher les nouveautés sur l\'icône » et accepte. Le chiffre se met à jour quand l\'appli tourne.</p>' },
+      '<p><b>Pastille sur l\'icône de l\'appli</b> (iPhone iOS 16.4 ou plus, appli installée, notifications activées) : chaque notification ajoute au chiffre rouge de l\'icône le nombre d\'articles ajoutés. Il revient à zéro dès que tu ouvres les courses. Pour l\'essayer seul : « Tester la pastille (appli fermée) », puis ferme l\'appli et attends 1 à 2 minutes.</p>' },
 
     { id: 'notifications', titre: 'Notifications sur le téléphone', html:
       '<p>Quand quelqu\'un ajoute des articles à une liste de courses que tu vois, tu reçois une <b>notification</b>, même appli fermée (« Julie a ajouté 3 articles : Pain, Lait, Œufs à la liste de Marc »). Elle arrive environ une minute après le dernier ajout, pour regrouper les articles.</p>' +

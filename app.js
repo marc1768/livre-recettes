@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.8';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.9';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -68,6 +68,8 @@
     '<path d="M50 34h60"/><path d="M76 29h8"/><path d="M52 38h56l-4 30a6 6 0 0 1-6 5H62a6 6 0 0 1-6-5z"/>' +
     '<path d="M52 44H38M108 44h14"/></g><text x="80" y="86" text-anchor="middle" fill="#fff" font-size="9" opacity=".85">' + esc(c || '') + '</text></svg></div>';
   const cvar = c => '--c:' + catStyle(c)[0];
+  const MAX_PHOTOS = 5;
+  const photosDe = r => lines(r && r.photo_url).slice(0, MAX_PHOTOS);     // plusieurs photos : une par ligne, la 1re = principale
   function photoSrc(u, w) {
     u = String(u || '').trim();
     const m = u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=|thumbnail\?id=)([\w-]{20,})/);
@@ -249,7 +251,7 @@
       const ms = mainStep(r);
       return '<div class="card' + (estNouvelle(r) ? ' new' : '') + '" data-id="' + esc(r.id) + '" style="' + cvar(r.categorie) + '">' +
         (estNouvelle(r) ? '<span class="newbadge">NOUVELLE</span>' : '') +
-        (r.photo_url ? '<img class="thumb" loading="lazy" src="' + esc(photoSrc(r.photo_url, 600)) + '" alt="" onerror="this.outerHTML=phHtmlGlobal(this)">' : phHtml(r.categorie)) +
+        (r.photo_url ? '<img class="thumb" loading="lazy" src="' + esc(photoSrc(photosDe(r)[0], 600)) + '" alt="" onerror="this.outerHTML=phHtmlGlobal(this)">' : phHtml(r.categorie)) +
         '<div class="cbody">' +
           '<div class="cat">' + esc(r.categorie || 'Sans catégorie') + '</div>' +
           '<h3>' + esc(r.titre) + '</h3>' +
@@ -300,7 +302,8 @@
         (r.auteur ? '<span>✍ ' + esc(r.auteur) + '</span>' : '') + '</div>' +
       '<div class="tags" style="margin-top:8px">' + split(r.modes_cuisson).map(m => '<span class="tag">' + esc(m) + '</span>').join('') + statusBadge(r.statut) + '</div>' +
       (interactive ? rateHtml(r) : (+r.note_nb ? '<div style="margin-top:6px">' + starsHtml(+r.note_moyenne, +r.note_nb) + '</div>' : '')) +
-      (r.photo_url ? '<img class="hero-img" src="' + esc(photoSrc(r.photo_url, 1200)) + '" alt="">' : '');
+      (r.photo_url ? '<img class="hero-img" id="heroImg" src="' + esc(photoSrc(photosDe(r)[0], 1200)) + '" alt="">' +
+        (interactive && photosDe(r).length > 1 ? '<div class="gal no-print">' + photosDe(r).map((u, i) => '<img src="' + esc(photoSrc(u, 300)) + '" data-gal="' + esc(photoSrc(u, 1200)) + '"' + (i ? '' : ' class="on"') + ' alt="Photo ' + (i + 1) + '">').join('') + '</div>' : '') : '');
     if (r.reglages_appareil) h += '<h4>Réglages</h4>' + reglagesHtml(r);
     if (r.ingredients || r.etapes) h += '<div class="cols"><div>' + (r.ingredients ? '<h4>Ingrédients</h4>' + ingredientsHtml(r, interactive) : '') + '</div>' +
       '<div>' + (r.etapes ? '<h4>Préparation</h4><ol class="steps">' + lines(r.etapes).map(s => '<li>' + esc(s.replace(/^\d+[.)]\s*/, '')) + '</li>').join('') + '</ol>' : '') + '</div></div>';
@@ -340,7 +343,7 @@
 
   // ---------- vue : formulaire recette ----------
   const H = id => ' <button type="button" class="hbtn" data-help="' + id + '" aria-label="Aide">?</button>';
-  let pending = null, photoSuppr = false, editSteps = [], editDevice = '';
+  let editPhotos = [], editSteps = [], editDevice = '';     // editPhotos : [{url}] déjà en ligne ou [{data}] à envoyer
   function stepperHtml(kind, i, v) {
     const txt = kind === 'temp' ? (v ? v + ' °C' : '— °C') : (v ? v + ' min' : '— min');
     return '<div class="stepper"><button type="button" data-step="' + kind + '" data-i="' + i + '" data-d="-1" aria-label="moins">−</button><span>' + txt +
@@ -379,7 +382,7 @@
     editDevice = pr.device || L.appareils[0];
     editSteps = pr.steps.length ? pr.steps : [{ label: 'Cuisson', temp: 180, time: 12, time2: 0, rem: '' }];
     const devs = L.appareils.slice(); if (devs.indexOf(editDevice) < 0) devs.push(editDevice);
-    pending = null; photoSuppr = false;
+    editPhotos = photosDe(r).map(u => (/^data:/.test(u) ? { data: u } : { url: u }));
     app.innerHTML =
       '<form class="edit" id="form" autocomplete="off" style="' + cvar(r.categorie || 'Plat') + '">' +
       '<h2>' + (r.id ? 'Modifier ' + esc(r.id) : 'Nouvelle recette') + ' <button type="button" class="btn sm hlink" data-help="titre">❓ Aide</button></h2>' +
@@ -404,14 +407,12 @@
         '<div class="field"><label for="f_src">Sources</label><input type="text" id="f_src" value="' + esc(lines(r.sources).join(' ; ')) + '" placeholder="Livre, site, Claude…"></div>' +
       '</div>' +
       '<div class="field"><label for="f_notes">Notes' + H('statut') + '</label><textarea id="f_notes" rows="3" placeholder="Réglages réels, ajustements…">' + esc(r.notes_marc) + '</textarea></div>' +
-      '<div class="field"><span class="lbl">Photo' + H('photo') + '</span><div class="photo-box">' +
-        '<img id="f_prev" alt="" src="' + esc(r.photo_url ? photoSrc(r.photo_url, 600) : '') + '"' + (r.photo_url ? '' : ' hidden') + '>' +
+      '<div class="field"><span class="lbl">Photos (jusqu\'à ' + MAX_PHOTOS + ')' + H('photo') + '</span><div class="photos-ed" id="photosEd"></div>' +
         '<div class="photo-btns">' +
-          '<span class="btn filebtn">📷 Choisir / prendre une photo<input type="file" id="f_file" accept="image/*"></span>' +
-          '<input type="url" id="f_url" placeholder="… ou coller un lien (Drive ou image web)" value="' + esc(/^data:/.test(r.photo_url || '') ? '' : r.photo_url) + '">' +
-          '<button type="button" class="btn sm danger" id="f_delphoto"' + (r.photo_url ? '' : ' hidden') + '>🗑 Supprimer la photo</button>' +
-          '<small id="f_pinfo">' + (r.photo_url ? 'Photo actuelle conservée.' : 'La photo est réduite (~300 Ko) avant l\'envoi.') + '</small>' +
-        '</div></div></div>' +
+          '<span class="btn filebtn" id="f_addbtn">📷 Ajouter des photos<input type="file" id="f_file" accept="image/*" multiple></span>' +
+          '<div class="urlrow"><input type="url" id="f_url" placeholder="… ou coller un lien (Drive ou image web)"><button type="button" class="btn sm" id="f_addurl">Ajouter</button></div>' +
+          '<small id="f_pinfo">La première photo est la photo principale. Les photos sont réduites (~300 Ko) avant l\'envoi.</small>' +
+        '</div></div>' +
       (r.id ? '<p class="src">Tes modifications ne seront visibles que par toi (« ma version »). Les autres continuent à voir la recette d\'origine.</p>' : '') +
       (r.id && estAdmin() ? '<div class="delzone"><button type="button" class="btn danger" data-act="delete">🗑 Supprimer cette recette</button><small>' + H('supprimer') + ' Visible seulement sur ton compte administrateur. Supprime la recette pour tout le monde (avec les versions personnelles).</small></div>' : '') +
       '<div class="formbar">' +
@@ -428,28 +429,41 @@
       if (t.dataset.lab) editSteps[+t.dataset.lab].label = t.value;
       if (t.dataset.rem) editSteps[+t.dataset.rem].rem = t.value;
     });
+    renderPhotosEd();
     $('f_file').addEventListener('change', async e => {
-      const f = e.target.files && e.target.files[0];
-      if (!f) return;
-      try {
-        $('f_pinfo').textContent = 'Préparation de la photo…';
-        pending = await reduirePhoto(f);
-        $('f_prev').src = pending.dataUrl; $('f_prev').hidden = false; $('f_url').value = ''; $('f_delphoto').hidden = false;
-        $('f_pinfo').textContent = 'Photo prête (' + Math.round(pending.taille / 1024) + ' Ko), envoyée à l\'enregistrement.';
-      } catch (err) { pending = null; $('f_pinfo').textContent = 'Photo illisible : ' + err.message; }
+      const fichiers = Array.from(e.target.files || []);
+      const place = MAX_PHOTOS - editPhotos.length;
+      if (fichiers.length > place) toast('Maximum ' + MAX_PHOTOS + ' photos : ' + (fichiers.length - place) + ' photo(s) ignorée(s).', true);
+      $('f_pinfo').textContent = 'Préparation des photos…';
+      for (const f of fichiers.slice(0, Math.max(0, place))) {
+        try { const p = await reduirePhoto(f); editPhotos.push({ data: p.dataUrl }); }
+        catch (err) { toast('Photo illisible : ' + err.message, true); }
+      }
+      e.target.value = ''; renderPhotosEd();
+      $('f_pinfo').textContent = 'Photos prêtes, envoyées à l\'enregistrement.';
     });
-    $('f_url').addEventListener('input', e => {
-      const u = e.target.value.trim();
-      if (u) { pending = null; photoSuppr = false; $('f_prev').src = photoSrc(u, 600); $('f_prev').hidden = false; $('f_delphoto').hidden = false; }
+    $('f_addurl').addEventListener('click', () => {
+      const u = $('f_url').value.trim(); if (!u) return;
+      if (editPhotos.length >= MAX_PHOTOS) { toast('Maximum ' + MAX_PHOTOS + ' photos.', true); return; }
+      editPhotos.push({ url: u }); $('f_url').value = ''; renderPhotosEd();
     });
-    $('f_delphoto').addEventListener('click', () => {
-      pending = null; photoSuppr = true; $('f_url').value = ''; $('f_file').value = '';
-      $('f_prev').hidden = true; $('f_prev').removeAttribute('src'); $('f_delphoto').hidden = true;
-      $('f_pinfo').textContent = 'Photo retirée : elle disparaîtra à l\'enregistrement.';
+    $('photosEd').addEventListener('click', e => {
+      const b = e.target.closest('[data-pdel],[data-pmain]'); if (!b) return;
+      if (b.dataset.pdel !== undefined) editPhotos.splice(+b.dataset.pdel, 1);
+      else { const p = editPhotos.splice(+b.dataset.pmain, 1)[0]; editPhotos.unshift(p); }
+      renderPhotosEd();
     });
     $('form').addEventListener('submit', e => { e.preventDefault(); enregistrer(r); });
   }
 
+  function renderPhotosEd() {
+    const box = $('photosEd'); if (!box) return;
+    box.innerHTML = editPhotos.length ? editPhotos.map((p, i) => '<div class="pth' + (i ? '' : ' main') + '"><img src="' + esc(p.data || photoSrc(p.url, 300)) + '" alt="">' +
+      (i ? '<button type="button" class="pmain" data-pmain="' + i + '" title="Mettre en photo principale">★</button>' : '<span class="ptag">Principale</span>') +
+      '<button type="button" class="pdel" data-pdel="' + i + '" aria-label="Retirer la photo">✕</button></div>').join('') : '<span class="src">Aucune photo : une casserole aux couleurs de la catégorie sera affichée.</span>';
+    const plein = editPhotos.length >= MAX_PHOTOS;
+    $('f_addbtn').classList.toggle('disabled', plein); $('f_file').disabled = plein;
+  }
   function reduirePhoto(file) {
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
@@ -501,14 +515,13 @@
       notes_marc: $('f_notes').value.trim()
     };
     if (!rec.titre) { toast('Le titre est obligatoire.', true); return; }
-    // photo : nouvelle (à envoyer), supprimée, lien collé, ou inchangée
-    let photo = null, local = '';
-    const lien = $('f_url').value.trim();
-    if (pending) { photo = pending.dataUrl; local = photo; }
-    else if (photoSuppr) rec.photo_url = '';
-    else if (lien) rec.photo_url = lien;
-    else if (/^data:/.test(ancienne.photo_url || '')) photo = 'garder';
-    else rec.photo_url = '';
+    // photos : celles déjà en ligne restent dans photo_url, les nouvelles (data) sont envoyées par la file
+    const lienEnCours = $('f_url').value.trim();
+    if (lienEnCours && editPhotos.length < MAX_PHOTOS) editPhotos.push({ url: lienEnCours });
+    const enLigne = editPhotos.filter(p => p.url).map(p => p.url);
+    const aEnvoyer = editPhotos.filter(p => p.data).map(p => p.data);
+    rec.photo_url = enLigne.join('\n');
+    const local = editPhotos.map(p => p.url || p.data).join('\n');
 
     const creation = !ancienne.id;
     const id = creation ? 'TMP' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) : ancienne.id;
@@ -521,14 +534,14 @@
         nonce: Date.now().toString(36) + Math.random().toString(36).slice(2) };
       q.push(it);
     }
-    if (photo && photo !== 'garder') it.photo = photo;
-    else if (!photo && 'photo_url' in rec) it.photo = null;
+    let k = 0; it.ordre = editPhotos.map(p => (p.url ? p.url : '#' + (k++)));   // ordre voulu (photos à envoyer = #0, #1…)
+    it.photos = aEnvoyer; delete it.photo;
     setOutbox(q);
 
     // copie locale affichée tout de suite
     const today = new Date().toLocaleDateString('fr-BE');
     const loc = Object.assign({}, ancienne, rec, { id: id });
-    if (local) loc.photo_url = local;
+    loc.photo_url = local;
     if (creation) Object.assign(loc, { auteur: S.user.nom, peut_modifier: true, peut_supprimer: true, note_moyenne: 0, note_nb: 0, ma_note: 0, date_ajout: today });
     else if (String(id).indexOf('TMP') !== 0) Object.assign(loc, { ma_version: true, ma_version_date: today });
     const i = S.data.findIndex(x => String(x.id) === String(id));
@@ -575,9 +588,13 @@
             it.rec = {}; it.base = saved;
           }
           let saved = it.base;
-          if (it.photo) {
-            const url = (await api('photo', { id: it.id, mime: 'image/jpeg', data: it.photo }, { essais: 2 })).url;
-            saved = (await api('save', { recette: { id: it.id, photo_url: url, photo_initiale: !!it.photoInitiale } })).recette;
+          const nouvelles = it.photos || (it.photo && it.photo !== 'garder' ? [it.photo] : []);
+          if (nouvelles.length) {
+            const urls = [];
+            for (const data of nouvelles) urls.push((await api('photo', { id: it.id, mime: 'image/jpeg', data: data }, { essais: 2 })).url);
+            const liste = it.ordre ? it.ordre.map(x => (x.charAt(0) === '#' ? urls[+x.slice(1)] : x)).filter(Boolean)
+              : lines(saved && saved.photo_url).filter(u => !/^data:/.test(u)).concat(urls);
+            saved = (await api('save', { recette: { id: it.id, photo_url: liste.slice(0, MAX_PHOTOS).join('\n'), photo_initiale: !!it.photoInitiale } })).recette;
           }
           setOutbox(outbox().filter(x => x.qid !== it.qid));
           // mise à jour de la copie locale avec la réponse du serveur (sauf si une autre modif attend encore)
@@ -719,6 +736,7 @@
     try {                                            // pastille sur l'icône de l'appli (si le téléphone l'autorise)
       if (n && navigator.setAppBadge) navigator.setAppBadge(n).catch(() => {});
       else if (!n && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
+      if (window.caches) caches.open('lr-badge').then(c => c.put('n', new Response(String(n)))).catch(() => {});   // compteur repris par les notifications
     } catch (e) { /* non pris en charge */ }
   }
   function etatCourses() {
@@ -848,7 +866,7 @@
     if (!pushPossible()) return estIOS() && !appInstallee()
       ? '<p class="src notifinfo">🔔 Pour recevoir les notifications sur iPhone, installe d\'abord l\'appli sur l\'écran d\'accueil (Partager → « Sur l\'écran d\'accueil ») et ouvre-la depuis l\'icône.' + H('notifications') + '</p>'
       : '<p class="src notifinfo">🔔 Ce navigateur ne permet pas les notifications.</p>';
-    if (Notification.permission === 'granted' && store.get('lr_push_token', '')) return '<p class="src notifinfo">🔔 Notifications activées sur ce téléphone. <button class="btn sm" data-act="ntest">Tester</button>' + H('notifications') + '</p>';
+    if (Notification.permission === 'granted' && store.get('lr_push_token', '')) return '<p class="src notifinfo">🔔 Notifications activées sur ce téléphone. <button class="btn sm" data-act="ntest">Tester</button> <button class="btn sm" data-act="ntestd">Tester la pastille (appli fermée)</button>' + H('notifications') + '</p>';
     if (Notification.permission === 'denied') return '<p class="src notifinfo">🔕 Notifications bloquées : autorise-les dans les réglages du téléphone (Réglages → Notifications → Recettes).' + H('notifications') + '</p>';
     return '<button class="btn sm primary" data-act="nactiver">🔔 Activer les notifications</button>' + H('notifications');
   }
@@ -867,9 +885,12 @@
     } catch (e) { toast('Activation impossible : ' + e.message, true); }
     finally { busy(false); render(); }
   }
-  async function testerNotifications() {
-    try { const j = await api('push_test', {}, { essais: 1 }); toast(j.envoyes ? 'Notification envoyée : elle doit arriver dans quelques secondes.' : 'Aucun appareil enregistré.', !j.envoyes); }
-    catch (e) { toast(e.message, true); }
+  async function testerNotifications(differe) {
+    try {
+      const j = await api('push_test', { differe: !!differe }, { essais: 1 });
+      if (differe) toast('Test programmé : ferme l\'appli maintenant. Dans 1 à 2 minutes : notification + pastille « 1 » sur l\'icône.');
+      else toast(j.envoyes ? 'Notification envoyée : elle doit arriver dans quelques secondes.' : 'Aucun appareil enregistré.', !j.envoyes);
+    } catch (e) { toast(e.message, true); }
   }
   async function rafraichirJetonPush() {                     // une fois par ouverture : le jeton peut changer
     if (!pushPossible() || Notification.permission !== 'granted' || !S.user || ss.get('lr_push_ok')) return;
@@ -1047,6 +1068,8 @@
     }
     const card = t.closest('.card');
     if (card) { S.id = card.getAttribute('data-id'); S.view = 'recipe'; render(); return; }
+    const gal = t.closest('[data-gal]');
+    if (gal) { const h = $('heroImg'); if (h) h.src = gal.dataset.gal; document.querySelectorAll('.gal img').forEach(x => x.classList.toggle('on', x === gal)); return; }
     const star = t.closest('[data-star]');
     if (star) { noter(+star.dataset.star); return; }
     const stp = t.closest('[data-step]');
@@ -1074,7 +1097,8 @@
     if (act === 'cvider') { viderCourses(actEl); return; }
     if (act === 'cpurge') { retirerCoches(actEl); return; }
     if (act === 'nactiver') { activerNotifications(); return; }
-    if (act === 'ntest') { testerNotifications(); return; }
+    if (act === 'ntest') { testerNotifications(false); return; }
+    if (act === 'ntestd') { testerNotifications(true); return; }
     if (act === 'edit') { S.view = 'form'; render(); return; }
     if (act === 'cancel') { S.view = S.id && S.data.some(r => String(r.id) === String(S.id)) ? 'recipe' : 'list'; render(); return; }
     if (act === 'delete') { supprimer(actEl); return; }

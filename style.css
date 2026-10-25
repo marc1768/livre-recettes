@@ -305,3 +305,17 @@ img,video{max-width:100%}
 .loading p{margin:0;font-weight:700;color:var(--ink);font-size:17px}
 .loading .spin{width:42px;height:42px;border-radius:50%;border:4px solid var(--line);border-top-color:#b5542a;animation:lrspin 1s linear infinite}
 @keyframes lrspin{to{transform:rotate(360deg)}}
+
+/* v5.9 : plusieurs photos */
+.photos-ed{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px}
+.photos-ed .pth{position:relative;width:96px;height:72px;border-radius:8px;overflow:hidden;background:var(--line)}
+.photos-ed .pth.main{outline:3px solid var(--c,#b5542a)}
+.photos-ed img{width:100%;height:100%;object-fit:cover;display:block}
+.photos-ed .pdel{position:absolute;top:3px;right:3px;width:24px;height:24px;border:0;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:13px;cursor:pointer;padding:0}
+.photos-ed .pmain{position:absolute;bottom:3px;left:3px;width:24px;height:24px;border:0;border-radius:50%;background:rgba(255,255,255,.9);color:#b5542a;font-size:13px;cursor:pointer;padding:0}
+.photos-ed .ptag{position:absolute;bottom:3px;left:3px;font-size:10px;font-weight:700;background:var(--c,#b5542a);color:#fff;border-radius:999px;padding:1px 6px}
+.urlrow{display:flex;gap:6px}.urlrow input{flex:1;min-width:0}
+.filebtn.disabled{opacity:.45;pointer-events:none}
+.gal{display:flex;gap:6px;margin:-4px 0 10px;overflow-x:auto}
+.gal img{width:74px;height:56px;object-fit:cover;border-radius:8px;cursor:pointer;opacity:.7;flex:none}
+.gal img.on{opacity:1;outline:3px solid var(--c,#b5542a)}
