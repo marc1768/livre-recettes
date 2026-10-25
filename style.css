@@ -217,3 +217,11 @@ form.edit h2,.panel h2{margin:0;font-size:22px}
 .btn.sync{background:#e8a33d;color:#fff;border-color:#e8a33d;font-weight:700}
 .btn.sync.spin{opacity:.75}
 .pend{background:#fff4e0;border:1px solid #e8a33d;color:#7a4a00;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:13px}
+
+/* v5.3 : nouvelles recettes + zone de suppression */
+.newbar{display:block;width:100%;margin:10px 0 0;padding:10px 14px;border:0;border-radius:12px;background:#d32f2f;color:#fff;font-weight:700;font-size:15px;text-align:left;cursor:pointer}
+.card{position:relative}
+.card.new{box-shadow:0 0 0 2px #d32f2f, var(--shadow)}
+.newbadge{position:absolute;top:10px;left:10px;z-index:2;background:#d32f2f;color:#fff;font-size:11px;font-weight:800;letter-spacing:.05em;padding:3px 8px;border-radius:999px}
+.delzone{margin:18px 0 6px;padding:12px;border:1px dashed #d32f2f;border-radius:12px;display:grid;gap:6px}
+.delzone small{color:#a33}

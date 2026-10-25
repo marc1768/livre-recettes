@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.2';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.3';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -18,7 +18,7 @@
   };
   const PHOTO_MAX = 1600, PHOTO_QUALITY = 0.8, TIMEOUT_MS = 60000;
 
-  const S = { data: [], listes: {}, maj: '', user: null, cat: '', q: '', mode: '', statut: '', auteur: '', view: 'list', id: null, busy: false };
+  const S = { data: [], listes: {}, maj: '', user: null, cat: '', q: '', mode: '', statut: '', auteur: '', view: 'list', id: null, busy: false, nouv: false };
   let syncEnCours = false;                       // envoi de la file en cours
   const $ = id => document.getElementById(id);
   const app = $('app');
@@ -166,11 +166,34 @@
     throw new Error('Réponse inattendue du serveur Google. Réessaie dans un instant.');
   }
 
+  // ---------- nouvelles recettes (indication rouge) ----------
+  // lr_connues (localStorage) : toutes les recettes déjà vues sur ce téléphone.
+  // lr_base (sessionStorage) : ce qui était connu à l'ouverture de l'appli → sert de référence pendant toute l'ouverture.
+  // Une recette ajoutée par quelqu'un d'autre depuis la dernière ouverture est « nouvelle » ; à l'ouverture suivante elle devient connue.
+  const estAdmin = () => !!(S.user && S.user.role === 'admin');
+  let BASE = null;
+  (function initNouveautes() {
+    const b = ss.get('lr_base');
+    if (b) { try { BASE = new Set(JSON.parse(b)); } catch (e) { BASE = null; } return; }
+    const k = store.get('lr_connues', null);
+    if (k) { BASE = new Set(k); ss.set('lr_base', JSON.stringify(k)); }
+  })();
+  function marquerConnues() {
+    const ids = S.data.map(r => String(r.id)).filter(i => i.indexOf('TMP') !== 0);
+    if (!ids.length) return;
+    if (!BASE) { BASE = new Set(ids); ss.set('lr_base', JSON.stringify(ids)); }   // toute première ouverture : rien n'est « nouveau »
+    const k = new Set(store.get('lr_connues', [])); ids.forEach(i => k.add(i)); store.set('lr_connues', Array.from(k));
+  }
+  const estNouvelle = r => !!BASE && String(r.id).indexOf('TMP') !== 0 && !BASE.has(String(r.id)) &&
+    !(S.user && norm(r.auteur) === norm(S.user.nom));
+  const nbNouvelles = () => S.data.filter(estNouvelle).length;
+
   // ---------- filtres ----------
   function filtered() {
     const q = norm(S.q), o = catOrder();
     const me = S.user ? norm(S.user.nom) : '';
     return S.data.filter(r => {
+      if (S.nouv && !estNouvelle(r)) return false;
       if (S.cat && r.categorie !== S.cat) return false;
       if (S.mode && split(r.modes_cuisson).indexOf(S.mode) < 0) return false;
       if (S.statut && r.statut !== S.statut) return false;
@@ -215,12 +238,17 @@
     const prenom = S.user ? S.user.nom : '';
     let h = '<section class="hero"><h2>Bonjour ' + esc(prenom) + ' !</h2><p>' + S.data.length + ' recette' + (S.data.length > 1 ? 's' : '') +
       ' dans le livre' + (S.maj ? ' · mis à jour ' + esc(S.maj) : '') + ' · appli ' + APP_VERSION + '</p></section>';
+    const nn = nbNouvelles();
+    if (nn) h += '<button class="newbar" data-act="nouv">🔴 ' + nn + (nn > 1 ? ' nouvelles recettes' : ' nouvelle recette') +
+      (S.nouv ? ' — <u>tout afficher</u>' : ' — <u>voir</u>') + '</button>';
+    else S.nouv = false;
     if (!S.data.length) { app.innerHTML = h + '<div class="empty">Aucune recette pour l\'instant. Ajoute la première avec « + Recette ».</div>'; return; }
     h += '<div class="count">' + list.length + ' résultat' + (list.length > 1 ? 's' : '') + '</div>';
     if (!list.length) h += '<div class="empty">Aucune recette ne correspond aux filtres.</div>';
     h += '<div class="grid">' + list.map(r => {
       const ms = mainStep(r);
-      return '<div class="card" data-id="' + esc(r.id) + '" style="' + cvar(r.categorie) + '">' +
+      return '<div class="card' + (estNouvelle(r) ? ' new' : '') + '" data-id="' + esc(r.id) + '" style="' + cvar(r.categorie) + '">' +
+        (estNouvelle(r) ? '<span class="newbadge">NOUVELLE</span>' : '') +
         (r.photo_url ? '<img class="thumb" loading="lazy" src="' + esc(photoSrc(r.photo_url, 600)) + '" alt="" onerror="this.outerHTML=phHtmlGlobal(this)">' : phHtml(r.categorie)) +
         '<div class="cbody">' +
           '<div class="cat">' + esc(r.categorie || 'Sans catégorie') + '</div>' +
@@ -383,7 +411,8 @@
           '<small id="f_pinfo">' + (r.photo_url ? 'Photo actuelle conservée.' : 'La photo est réduite (~300 Ko) avant l\'envoi.') + '</small>' +
         '</div></div></div>' +
       (r.id ? '<p class="src">Tes modifications ne seront visibles que par toi (« ma version »). Les autres continuent à voir la recette d\'origine.</p>' : '') +
-      '<div class="formbar">' + (r.id && r.peut_supprimer ? '<button type="button" class="btn danger left" data-act="delete">Supprimer pour tous</button>' : '') +
+      (r.id && estAdmin() ? '<div class="delzone"><button type="button" class="btn danger" data-act="delete">🗑 Supprimer cette recette</button><small>Visible seulement sur ton compte administrateur. Supprime la recette pour tout le monde (avec les versions personnelles).</small></div>' : '') +
+      '<div class="formbar">' +
         '<button type="button" class="btn" data-act="cancel">Annuler</button>' +
         '<button type="submit" class="btn primary" id="f_save">Enregistrer</button></div>' +
       '</form>';
@@ -586,7 +615,7 @@
   }
 
   async function supprimer(btn) {
-    if (!btn.dataset.confirm) { btn.dataset.confirm = '1'; btn.textContent = 'Confirmer la suppression'; setTimeout(() => { if (btn.isConnected) { delete btn.dataset.confirm; btn.textContent = 'Supprimer'; } }, 5000); return; }
+    if (!btn.dataset.confirm) { btn.dataset.confirm = '1'; btn.textContent = 'Confirmer la suppression'; setTimeout(() => { if (btn.isConnected) { delete btn.dataset.confirm; btn.textContent = '🗑 Supprimer cette recette'; } }, 5000); return; }
     if (String(S.id).indexOf('TMP') === 0) {              // pas encore envoyée : suppression locale seulement
       setOutbox(outbox().filter(x => String(x.id) !== String(S.id)));
       S.data = S.data.filter(x => String(x.id) !== String(S.id)); saveCache();
@@ -781,6 +810,7 @@
     const actEl = t.closest('[data-act]');
     const act = actEl && actEl.getAttribute('data-act');
     if (act === 'back') { S.view = 'list'; render(); synchroniser(false); return; }
+    if (act === 'nouv') { S.nouv = !S.nouv; render(); return; }
     if (act === 'edit') { S.view = 'form'; render(); return; }
     if (act === 'cancel') { S.view = S.id && S.data.some(r => String(r.id) === String(S.id)) ? 'recipe' : 'list'; render(); return; }
     if (act === 'delete') { supprimer(actEl); return; }
@@ -820,7 +850,7 @@
       locales.forEach(l => { const i = S.data.findIndex(x => String(x.id) === String(l.id)); if (i >= 0) S.data[i] = l; else S.data.push(l); }); S.listes = d.listes || {}; S.maj = d.maj || '';
       S.user = d.user; store.set('lr_user', S.user);
       if (d.token && cfg().token) setCfg({ token: d.token });     // session prolongée par le serveur
-      saveCache();
+      saveCache(); marquerConnues();
       if (S.view !== 'form') render();
       if (force) toast(S.data.length + (S.data.length > 1 ? ' recettes chargées.' : ' recette chargée.'));
     } catch (err) {
@@ -892,7 +922,7 @@
   // Démarrage : affichage immédiat depuis le cache, puis mise à jour
   S.user = store.get('lr_user', null);
   const cache = store.get('lr_cache', null);
-  if (S.user && tok() && cache && cache.recettes) { S.data = cache.recettes; S.listes = cache.listes || {}; S.maj = cache.maj || ''; render(); }
+  if (S.user && tok() && cache && cache.recettes) { S.data = cache.recettes; S.listes = cache.listes || {}; S.maj = cache.maj || ''; marquerConnues(); render(); }
   majReseau(); majSync();
   load(false).then(() => synchroniser(true));
 

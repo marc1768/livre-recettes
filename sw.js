@@ -1,6 +1,6 @@
 /* Service worker : appli disponible hors ligne + cache des photos.
  * Les données (recettes) sont gérées par app.js (cache local), pas ici. */
-const VERSION = 'lr-v10';
+const VERSION = 'lr-v11';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 const PHOTOS = 'lr-photos';
 
