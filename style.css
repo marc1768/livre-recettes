@@ -319,3 +319,14 @@ img,video{max-width:100%}
 .gal{display:flex;gap:6px;margin:-4px 0 10px;overflow-x:auto}
 .gal img{width:74px;height:56px;object-fit:cover;border-radius:8px;cursor:pointer;opacity:.7;flex:none}
 .gal img.on{opacity:1;outline:3px solid var(--c,#b5542a)}
+/* import d'une recette préparée par Claude (/recette) */
+.impbar{margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#fff4d6;border:1px solid #e8c56a;font-size:14px;line-height:1.45}
+.impwarn{display:inline-block;margin-top:6px;color:#a3361e;font-weight:700}
+.impph{margin:0 0 10px}
+.impph small{display:block;margin-bottom:6px;color:#6b665e}
+#impPh{display:flex;flex-wrap:wrap;gap:8px}
+.impt{position:relative;width:86px;height:86px;padding:0;border:3px solid transparent;border-radius:12px;overflow:hidden;background:#eee;cursor:pointer;opacity:.6}
+.impt img{width:100%;height:100%;object-fit:cover;display:block}
+.impt span{position:absolute;right:4px;bottom:4px;width:24px;height:24px;border-radius:50%;background:#fff;color:#2b2a28;font-weight:800;font-size:15px;line-height:24px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.impt.on{border-color:#b5542a;opacity:1}
+.impt.on span{background:#b5542a;color:#fff}

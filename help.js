@@ -80,6 +80,12 @@
     { id: 'enregistrer', titre: 'Enregistrer et envoi', html:
       '<p><b>Enregistrer</b> est immédiat : la recette est mise à jour sur le téléphone.</p>' +
       '<p>L\'envoi au serveur se fait au <b>retour à la liste</b>, avec le bouton orange <b>⬆</b>, au retour du réseau ou quand l\'appli passe en arrière-plan. Une fiche pas encore envoyée affiche « ⏳ Enregistrée sur le téléphone ». Hors ligne, rien n\'est perdu.</p>' },
+    { id: 'importer', titre: 'Importer une recette avec Claude (/recette)', html:
+      '<p>Dans une conversation Claude, tape <b>/recette</b> et donne une <b>photo</b> (livre, carnet, écran), un <b>PDF</b> ou le <b>lien</b> d\'une recette en ligne. Claude lit tout, te montre un tableau à corriger, puis te donne un lien <b>« Ouvrir dans le livre »</b>.</p>' +
+      '<p>Le lien ouvre ce formulaire <b>déjà rempli</b>, avec un bandeau jaune « Préparée par Claude ». Vérifie chaque case et modifie ce que tu veux. <b>Rien n\'est ajouté au livre tant que tu n\'as pas touché Enregistrer.</b></p>' +
+      '<p><b>Photos trouvées par Claude</b> : touche une vignette pour l\'ajouter (✓) ou la retirer (+). 5 photos au maximum.</p>' +
+      '<p><b>Auteur</b> (compte administrateur seulement) : le nom affiché sur la fiche, par exemple « Severin » ou « Mamy ». Un message te prévient si une recette du même nom existe déjà.</p>' +
+      '<p>Sur iPhone, le lien s\'ouvre dans Safari : connecte-toi une fois dans Safari aussi (« Rester connecté »).</p>' },
     { id: 'supprimer', titre: 'Supprimer une recette', html:
       '<p>Réservé à l\'<b>administrateur</b> : dans le formulaire de modification, encadré rouge <b>« 🗑 Supprimer cette recette »</b>, à toucher deux fois pour confirmer. La recette disparaît pour tout le monde, versions personnelles comprises.</p>' },
 

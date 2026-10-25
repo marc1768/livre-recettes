@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.10';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.11';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -53,6 +53,16 @@
     setCfg({ url: decodeURIComponent(m[1]), key: decodeURIComponent(m[2]) });
     history.replaceState(null, '', location.pathname + location.search);
   })();
+
+  // Lien d'import d'une recette préparée par Claude (/recette) : #import=<JSON compressé gzip, base64url>
+  function importFromHash() {
+    const m = location.hash.match(/^#import=([\w-]+)$/);
+    if (!m) return false;
+    try { localStorage.setItem('lr_import', JSON.stringify({ raw: m[1], t: Date.now() })); } catch (e) { /* ignoré */ }
+    history.replaceState(null, '', location.pathname + location.search);
+    return true;
+  }
+  importFromHash();
 
   // ---------- utilitaires ----------
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -372,26 +382,32 @@
 
   function renderForm() {
     chrome(true, false);
-    const r = S.id ? (S.data.find(x => String(x.id) === String(S.id)) || {}) : {};
+    const r = S.id ? (S.data.find(x => String(x.id) === String(S.id)) || {}) : (S.draft || {});
+    const imp = !S.id && S.draft ? S.draft : null;
     const L = listes();
     const modesSel = split(r.modes_cuisson);
-    const mode = r.id ? modesSel : ['Air fryer'];
+    const mode = r.id || (imp && modesSel.length) ? modesSel : ['Air fryer'];
     const allModes = L.modes.slice(); modesSel.forEach(m => { if (allModes.indexOf(m) < 0) allModes.push(m); });
     const opt = (arr, v) => arr.map(x => '<option' + (x === v ? ' selected' : '') + '>' + esc(x) + '</option>').join('');
     const pr = parseRegs(r.reglages_appareil);
     editDevice = pr.device || L.appareils[0];
     editSteps = pr.steps.length ? pr.steps : [{ label: 'Cuisson', temp: 180, time: 12, time2: 0, rem: '' }];
     const devs = L.appareils.slice(); if (devs.indexOf(editDevice) < 0) devs.push(editDevice);
-    editPhotos = photosDe(r).map(u => (/^data:/.test(u) ? { data: u } : { url: u }));
+    editPhotos = imp ? (imp.photos || []).slice(0, 1).map(photoItem) : photosDe(r).map(photoItem);
+    const auteurs = []; S.data.forEach(x => { if (x.auteur && auteurs.indexOf(x.auteur) < 0) auteurs.push(x.auteur); });
+    const doublon = imp && S.data.find(x => norm(x.titre) === norm(imp.titre));
     app.innerHTML =
       '<form class="edit" id="form" autocomplete="off" style="' + cvar(r.categorie || 'Plat') + '">' +
-      '<h2>' + (r.id ? 'Modifier ' + esc(r.id) : 'Nouvelle recette') + ' <button type="button" class="btn sm hlink" data-help="titre">❓ Aide</button></h2>' +
+      '<h2>' + (r.id ? 'Modifier ' + esc(r.id) : imp ? 'Recette importée' : 'Nouvelle recette') + ' <button type="button" class="btn sm hlink" data-help="' + (imp ? 'importer' : 'titre') + '">❓ Aide</button></h2>' +
+      (imp ? '<div class="impbar"><b>📥 Préparée par Claude</b> : vérifie chaque case, change ce que tu veux, choisis les photos, puis <b>Enregistrer</b>. Rien n\'est ajouté au livre tant que tu n\'as pas enregistré.' +
+        (doublon ? '<br><span class="impwarn">⚠ Une recette « ' + esc(doublon.titre) + ' » existe déjà dans le livre.</span>' : '') + '</div>' : '') +
       '<div class="field"><label for="f_titre">Titre *' + H('titre') + '</label><input type="text" id="f_titre" required value="' + esc(r.titre) + '"></div>' +
       '<div class="row3">' +
         '<div class="field"><label for="f_cat">Catégorie</label><select id="f_cat">' + opt(L.categories, r.categorie || 'Plat') + '</select></div>' +
         '<div class="field"><label for="f_pers">Personnes</label><input type="number" min="1" id="f_pers" value="' + esc(r.personnes || 2) + '"></div>' +
         '<div class="field"><label for="f_temps">Temps total (min)</label><input type="number" min="0" id="f_temps" value="' + esc(r.temps_min) + '"></div>' +
       '</div>' +
+      (!r.id && estAdmin() ? '<div class="field"><label for="f_aut">Auteur' + H('importer') + '</label><input type="text" id="f_aut" list="f_autl" value="' + esc(r.auteur || S.user.nom) + '"><datalist id="f_autl">' + auteurs.map(a => '<option value="' + esc(a) + '">').join('') + '</datalist></div>' : '') +
       '<div class="field"><span class="lbl">Modes de cuisson' + H('modes') + '</span><div class="checks">' +
         allModes.map(m => '<label><input type="checkbox" name="mode" value="' + esc(m) + '"' + (mode.indexOf(m) >= 0 ? ' checked' : '') + '>' + esc(m) + '</label>').join('') + '</div></div>' +
       '<div class="field"><span class="lbl">Réglages de cuisson' + H('reglages') + '</span>' +
@@ -407,7 +423,9 @@
         '<div class="field"><label for="f_src">Sources</label><input type="text" id="f_src" value="' + esc(lines(r.sources).join(' ; ')) + '" placeholder="Livre, site, Claude…"></div>' +
       '</div>' +
       '<div class="field"><label for="f_notes">Notes' + H('statut') + '</label><textarea id="f_notes" rows="3" placeholder="Réglages réels, ajustements…">' + esc(r.notes_marc) + '</textarea></div>' +
-      '<div class="field"><span class="lbl">Photos (jusqu\'à ' + MAX_PHOTOS + ')' + H('photo') + '</span><div class="photos-ed" id="photosEd"></div>' +
+      '<div class="field"><span class="lbl">Photos (jusqu\'à ' + MAX_PHOTOS + ')' + H('photo') + '</span>' +
+        (imp && (imp.photos || []).length ? '<div class="impph"><small>Photos trouvées par Claude : touche pour ajouter ou retirer.</small><div id="impPh"></div></div>' : '') +
+        '<div class="photos-ed" id="photosEd"></div>' +
         '<div class="photo-btns">' +
           '<span class="btn filebtn" id="f_addbtn">📷 Ajouter des photos<input type="file" id="f_file" accept="image/*" multiple></span>' +
           '<div class="urlrow"><input type="url" id="f_url" placeholder="… ou coller un lien (Drive ou image web)"><button type="button" class="btn sm" id="f_addurl">Ajouter</button></div>' +
@@ -430,6 +448,14 @@
       if (t.dataset.rem) editSteps[+t.dataset.rem].rem = t.value;
     });
     renderPhotosEd();
+    if ($('impPh')) $('impPh').addEventListener('click', e => {
+      const b = e.target.closest('[data-imp]'); if (!b) return;
+      const v = imp.photos[+b.dataset.imp], k = editPhotos.findIndex(p => (p.url || p.data) === v);
+      if (k >= 0) editPhotos.splice(k, 1);
+      else if (editPhotos.length >= MAX_PHOTOS) { toast('Maximum ' + MAX_PHOTOS + ' photos.', true); return; }
+      else editPhotos.push(photoItem(v));
+      renderPhotosEd();
+    });
     $('f_file').addEventListener('change', async e => {
       const fichiers = Array.from(e.target.files || []);
       const place = MAX_PHOTOS - editPhotos.length;
@@ -456,8 +482,14 @@
     $('form').addEventListener('submit', e => { e.preventDefault(); enregistrer(r); });
   }
 
+  const photoItem = u => (/^data:/.test(u) ? { data: u } : { url: u });
   function renderPhotosEd() {
     const box = $('photosEd'); if (!box) return;
+    const ib = $('impPh');
+    if (ib && S.draft) ib.innerHTML = S.draft.photos.map((v, i) => {
+      const on = editPhotos.some(p => (p.url || p.data) === v);
+      return '<button type="button" class="impt' + (on ? ' on' : '') + '" data-imp="' + i + '"><img src="' + esc(/^data:/.test(v) ? v : photoSrc(v, 300)) + '" alt=""><span>' + (on ? '✓' : '+') + '</span></button>';
+    }).join('');
     box.innerHTML = editPhotos.length ? editPhotos.map((p, i) => '<div class="pth' + (i ? '' : ' main') + '"><img src="' + esc(p.data || photoSrc(p.url, 300)) + '" alt="">' +
       (i ? '<button type="button" class="pmain" data-pmain="' + i + '" title="Mettre en photo principale">★</button>' : '<span class="ptag">Principale</span>') +
       '<button type="button" class="pdel" data-pdel="' + i + '" aria-label="Retirer la photo">✕</button></div>').join('') : '<span class="src">Aucune photo : une casserole aux couleurs de la catégorie sera affichée.</span>';
@@ -515,6 +547,7 @@
       notes_marc: $('f_notes').value.trim()
     };
     if (!rec.titre) { toast('Le titre est obligatoire.', true); return; }
+    if ($('f_aut') && $('f_aut').value.trim()) rec.auteur = $('f_aut').value.trim();
     // photos : celles déjà en ligne restent dans photo_url, les nouvelles (data) sont envoyées par la file
     const lienEnCours = $('f_url').value.trim();
     if (lienEnCours && editPhotos.length < MAX_PHOTOS) editPhotos.push({ url: lienEnCours });
@@ -542,7 +575,8 @@
     const today = new Date().toLocaleDateString('fr-BE');
     const loc = Object.assign({}, ancienne, rec, { id: id });
     loc.photo_url = local;
-    if (creation) Object.assign(loc, { auteur: S.user.nom, peut_modifier: true, peut_supprimer: true, note_moyenne: 0, note_nb: 0, ma_note: 0, date_ajout: today });
+    if (creation) S.draft = null;
+    if (creation) Object.assign(loc, { auteur: rec.auteur || S.user.nom, peut_modifier: true, peut_supprimer: true, note_moyenne: 0, note_nb: 0, ma_note: 0, date_ajout: today });
     else if (String(id).indexOf('TMP') !== 0) Object.assign(loc, { ma_version: true, ma_version_date: today });
     const i = S.data.findIndex(x => String(x.id) === String(id));
     if (i >= 0) S.data[i] = loc; else S.data.push(loc);
@@ -1013,12 +1047,44 @@
     busy(false);
     await load(true);
     rafraichirJetonPush();
+    ouvrirImport();
   }
   function deconnecter(silencieux) {
     setCfg({ token: '' }); ss.set('lr_tok', ''); store.del('lr_user'); store.del('lr_cache');
     S.user = null; S.data = [];
     if (!silencieux) renderLogin('Déconnecté.');
     else setTimeout(() => renderLogin('Session terminée : reconnecte-toi.'), 0);
+  }
+
+  // ---------- import d'une recette préparée par Claude ----------
+  async function decoderImport(raw) {
+    const b64 = raw.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = Uint8Array.from(atob(b64 + '==='.slice((b64.length + 3) % 4)), c => c.charCodeAt(0));
+    const flux = new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return JSON.parse(await new Response(flux).text());
+  }
+  function normaliserImport(o) {
+    const txt = v => (Array.isArray(v) ? v.map(x => String(x).trim()).filter(Boolean).join('\n') : String(v == null ? '' : v).trim());
+    const L = listes();
+    const cat = L.categories.find(c => norm(c) === norm(o.categorie)) || (o.categorie ? String(o.categorie) : 'Plat');
+    const modes = (Array.isArray(o.modes_cuisson) ? o.modes_cuisson : split(o.modes_cuisson)).join(', ');
+    let regs = o.reglages_appareil;
+    if (Array.isArray(regs)) regs = serializeRegs(o.appareil || L.appareils[0], regs.map(x => ({ label: x.label || x.etape || 'Cuisson', temp: +x.temp || 0, time: +x.time || +x.min || 0, time2: 0, rem: x.rem || x.remarque || '' })));
+    return { titre: txt(o.titre), categorie: cat, personnes: o.personnes || '', temps_min: o.temps_min || '', modes_cuisson: modes,
+      ingredients: txt(o.ingredients), etapes: txt(o.etapes), reglages_appareil: txt(regs), statut: o.statut || 'À tester',
+      sources: txt(o.sources), notes_marc: txt(o.notes || o.notes_marc), auteur: txt(o.auteur),
+      photos: (Array.isArray(o.photos) ? o.photos : lines(o.photos)).filter(u => /^(https?:|data:image\/)/.test(u)).slice(0, 12) };
+  }
+  async function ouvrirImport() {
+    if (!S.user || S.user.doit_changer) return;
+    const p = store.get('lr_import', null); if (!p || !p.raw) return;
+    store.del('lr_import');
+    if (Date.now() - (p.t || 0) > 3 * 86400000) return;
+    try {
+      S.draft = normaliserImport(await decoderImport(p.raw));
+      S.id = null; S.view = 'form'; render();
+      toast('📥 Recette importée : vérifie puis enregistre.');
+    } catch (e) { toast('Lien d\'import illisible : ' + e.message, true); }
   }
 
   // ---------- vue : livre ----------
@@ -1100,7 +1166,7 @@
     if (act === 'ntest') { testerNotifications(false); return; }
     if (act === 'ntestd') { testerNotifications(true); return; }
     if (act === 'edit') { S.view = 'form'; render(); return; }
-    if (act === 'cancel') { S.view = S.id && S.data.some(r => String(r.id) === String(S.id)) ? 'recipe' : 'list'; render(); return; }
+    if (act === 'cancel') { S.draft = null; S.view = S.id && S.data.some(r => String(r.id) === String(S.id)) ? 'recipe' : 'list'; render(); return; }
     if (act === 'delete') { supprimer(actEl); return; }
     if (act === 'reset') { revenirOriginal(actEl); return; }
     if (act === 'addstep') { editSteps.push({ label: 'Cuisson ' + (editSteps.length + 1), temp: 180, time: 10, time2: 0, rem: '' }); renderStepsEditor(); return; }
@@ -1112,7 +1178,7 @@
     if (act === 'logout') { deconnecter(false); return; }
     if (t.closest('#btnBook')) { S.view = 'book'; render(); return; }
     if (t.closest('#btnCourses')) { C.vuAff = null; S.view = 'courses'; render(); verifierCourses(true); return; }
-    if (t.id === 'btnNew') { S.id = null; S.view = 'form'; render(); return; }
+    if (t.id === 'btnNew') { S.id = null; S.draft = null; S.view = 'form'; render(); return; }
     if (t.id === 'btnMe') { S.view = 'me'; render(); return; }
     if (t.id === 'btnReload') { load(true); return; }
     if (t.id === 'btnSync') { synchroniser(false); return; }
@@ -1221,6 +1287,8 @@
   const ouvrirCourses = () => { if (!S.user) return; C.vuAff = null; S.view = 'courses'; render(); verifierCourses(true); };
   if (location.hash === '#courses') { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignoré */ } if (S.user) ouvrirCourses(); }
   if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.vue === 'courses') ouvrirCourses(); });
+  if (S.user) ouvrirImport();
+  window.addEventListener('hashchange', () => { if (importFromHash() && S.user) ouvrirImport(); });
   load(false).then(() => { synchroniser(true); if (S.user) { chargerCoursesLocal(); verifierCourses(true); rafraichirJetonPush(); } });
 
   if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
