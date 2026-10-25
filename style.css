@@ -225,3 +225,26 @@ form.edit h2,.panel h2{margin:0;font-size:22px}
 .newbadge{position:absolute;top:10px;left:10px;z-index:2;background:#d32f2f;color:#fff;font-size:11px;font-weight:800;letter-spacing:.05em;padding:3px 8px;border-radius:999px}
 .delzone{margin:18px 0 6px;padding:12px;border:1px dashed #d32f2f;border-radius:12px;display:grid;gap:6px}
 .delzone small{color:#a33}
+
+/* v5.4 : aide */
+.hbtn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-left:6px;border-radius:50%;border:1.5px solid var(--c,#b5542a);background:#fff;color:var(--c,#b5542a);font-weight:800;font-size:13px;line-height:1;cursor:pointer;vertical-align:middle;padding:0}
+.btn.hlink{margin-left:8px;vertical-align:middle;font-size:13px}
+.hero a.hhero{color:#fff;font-weight:700;text-decoration:underline}
+body.noscroll{overflow:hidden}
+.help{position:fixed;inset:0;z-index:1000;background:var(--bg,#faf6f0);display:flex;flex-direction:column}
+.help[hidden]{display:none}
+.help .hbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#b5542a;color:#fff;font-size:17px}
+.help .hclose{background:#fff;color:#b5542a;border:0;border-radius:999px;padding:7px 14px;font-weight:700;font-size:14px;cursor:pointer}
+.help .hscroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px 16px 40px;position:relative}
+.help .htoc{background:#fff;border:1px solid var(--line,#e8e0d4);border-radius:14px;padding:6px 14px 12px;margin:8px 0 6px}
+.help .htoc h2{font-size:18px;margin:8px 0}
+.help .htoc h4{margin:12px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#8a7f72}
+.help .htoc a{display:block;padding:7px 0;border-bottom:1px dashed #eee;color:#b5542a;text-decoration:none;font-weight:600}
+.help .hgrp{margin:24px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#8a7f72}
+.help .hsec{background:#fff;border:1px solid var(--line,#e8e0d4);border-radius:14px;padding:4px 16px 12px;margin:10px 0;line-height:1.5;font-size:15px;transition:box-shadow .3s}
+.help .hsec.on{box-shadow:0 0 0 3px #e8a33d;border-color:#e8a33d}
+.help .hsec h2{font-size:18px;margin:12px 0 6px}
+.help .hsec pre{background:#f5efe6;border-radius:8px;padding:8px 10px;white-space:pre-wrap;font-size:14px}
+.help .hsec ul{padding-left:20px}
+.help .htop{display:inline-block;margin-top:4px;font-size:13px;color:#8a7f72}
+@media print{.help{display:none!important}}

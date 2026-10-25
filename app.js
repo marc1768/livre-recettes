@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.3';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.4';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -237,7 +237,7 @@
     const list = filtered();
     const prenom = S.user ? S.user.nom : '';
     let h = '<section class="hero"><h2>Bonjour ' + esc(prenom) + ' !</h2><p>' + S.data.length + ' recette' + (S.data.length > 1 ? 's' : '') +
-      ' dans le livre' + (S.maj ? ' · mis à jour ' + esc(S.maj) : '') + ' · appli ' + APP_VERSION + '</p></section>';
+      ' dans le livre' + (S.maj ? ' · mis à jour ' + esc(S.maj) : '') + ' · appli ' + APP_VERSION + ' · <a href="#" class="hhero" data-help="__top">❓ Aide</a></p></section>';
     const nn = nbNouvelles();
     if (nn) h += '<button class="newbar" data-act="nouv">🔴 ' + nn + (nn > 1 ? ' nouvelles recettes' : ' nouvelle recette') +
       (S.nouv ? ' — <u>tout afficher</u>' : ' — <u>voir</u>') + '</button>';
@@ -315,6 +315,7 @@
     app.innerHTML = '<div class="actions no-print"><button class="btn" data-act="back">← Retour</button>' +
       '<button class="btn" data-act="edit">✎ Modifier</button>' +
       '<button class="btn" data-act="print">🖨 Imprimer</button>' +
+      '<button class="btn" data-help="fiche" aria-label="Aide">❓</button>' +
       (r.ma_version ? '<button class="btn" data-act="reset">↺ Revenir à l\'original</button>' : '') + '</div>' +
       (enAttente(r.id) ? '<div class="pend no-print">⏳ Enregistrée sur le téléphone — envoi au retour à la liste ou avec le bouton ⬆.</div>' : '') +
       (r.ma_version ? '<div class="myver no-print">✎ Ma version — modifiée' + (r.ma_version_date ? ' le ' + esc(r.ma_version_date) : '') + '. Les autres voient la recette d\'origine.</div>' : '') +
@@ -338,6 +339,7 @@
   }
 
   // ---------- vue : formulaire recette ----------
+  const H = id => ' <button type="button" class="hbtn" data-help="' + id + '" aria-label="Aide">?</button>';
   let pending = null, photoSuppr = false, editSteps = [], editDevice = '';
   function stepperHtml(kind, i, v) {
     const txt = kind === 'temp' ? (v ? v + ' °C' : '— °C') : (v ? v + ' min' : '— min');
@@ -380,29 +382,29 @@
     pending = null; photoSuppr = false;
     app.innerHTML =
       '<form class="edit" id="form" autocomplete="off" style="' + cvar(r.categorie || 'Plat') + '">' +
-      '<h2>' + (r.id ? 'Modifier ' + esc(r.id) : 'Nouvelle recette') + '</h2>' +
-      '<div class="field"><label for="f_titre">Titre *</label><input type="text" id="f_titre" required value="' + esc(r.titre) + '"></div>' +
+      '<h2>' + (r.id ? 'Modifier ' + esc(r.id) : 'Nouvelle recette') + ' <button type="button" class="btn sm hlink" data-help="titre">❓ Aide</button></h2>' +
+      '<div class="field"><label for="f_titre">Titre *' + H('titre') + '</label><input type="text" id="f_titre" required value="' + esc(r.titre) + '"></div>' +
       '<div class="row3">' +
         '<div class="field"><label for="f_cat">Catégorie</label><select id="f_cat">' + opt(L.categories, r.categorie || 'Plat') + '</select></div>' +
         '<div class="field"><label for="f_pers">Personnes</label><input type="number" min="1" id="f_pers" value="' + esc(r.personnes || 2) + '"></div>' +
         '<div class="field"><label for="f_temps">Temps total (min)</label><input type="number" min="0" id="f_temps" value="' + esc(r.temps_min) + '"></div>' +
       '</div>' +
-      '<div class="field"><span class="lbl">Modes de cuisson</span><div class="checks">' +
+      '<div class="field"><span class="lbl">Modes de cuisson' + H('modes') + '</span><div class="checks">' +
         allModes.map(m => '<label><input type="checkbox" name="mode" value="' + esc(m) + '"' + (mode.indexOf(m) >= 0 ? ' checked' : '') + '>' + esc(m) + '</label>').join('') + '</div></div>' +
-      '<div class="field"><span class="lbl">Réglages de cuisson</span>' +
+      '<div class="field"><span class="lbl">Réglages de cuisson' + H('reglages') + '</span>' +
         '<div class="row2"><select id="f_dev">' + opt(devs, editDevice) + '</select><small>Température par pas de 5 °C, temps par pas de 1 min. Une ligne par étape.</small></div>' +
         '<div class="steps-ed" id="stepsEd"></div>' +
         '<button type="button" class="btn sm" data-act="addstep" style="justify-self:start">+ Ajouter une étape</button></div>' +
-      '<div class="field"><label for="f_ing">Ingrédients</label><small>Un ingrédient par ligne. Ligne commençant par « # » = sous-titre (ex. # Sauce).</small>' +
+      '<div class="field"><label for="f_ing">Ingrédients' + H('ingredients') + '</label><small>Un ingrédient par ligne. Ligne commençant par « # » = sous-titre (ex. # Sauce).</small>' +
         '<textarea id="f_ing" rows="8">' + esc(r.ingredients) + '</textarea></div>' +
-      '<div class="field"><label for="f_etp">Préparation</label><small>Une étape par ligne (numérotation automatique).</small>' +
+      '<div class="field"><label for="f_etp">Préparation' + H('preparation') + '</label><small>Une étape par ligne (numérotation automatique).</small>' +
         '<textarea id="f_etp" rows="8">' + esc(r.etapes) + '</textarea></div>' +
       '<div class="row2">' +
-        '<div class="field"><label for="f_st">Statut</label><select id="f_st">' + opt(L.statuts, r.statut || L.statuts[0]) + '</select></div>' +
+        '<div class="field"><label for="f_st">Statut' + H('statut') + '</label><select id="f_st">' + opt(L.statuts, r.statut || L.statuts[0]) + '</select></div>' +
         '<div class="field"><label for="f_src">Sources</label><input type="text" id="f_src" value="' + esc(lines(r.sources).join(' ; ')) + '" placeholder="Livre, site, Claude…"></div>' +
       '</div>' +
-      '<div class="field"><label for="f_notes">Notes</label><textarea id="f_notes" rows="3" placeholder="Réglages réels, ajustements…">' + esc(r.notes_marc) + '</textarea></div>' +
-      '<div class="field"><span class="lbl">Photo</span><div class="photo-box">' +
+      '<div class="field"><label for="f_notes">Notes' + H('statut') + '</label><textarea id="f_notes" rows="3" placeholder="Réglages réels, ajustements…">' + esc(r.notes_marc) + '</textarea></div>' +
+      '<div class="field"><span class="lbl">Photo' + H('photo') + '</span><div class="photo-box">' +
         '<img id="f_prev" alt="" src="' + esc(r.photo_url ? photoSrc(r.photo_url, 600) : '') + '"' + (r.photo_url ? '' : ' hidden') + '>' +
         '<div class="photo-btns">' +
           '<span class="btn filebtn">📷 Choisir / prendre une photo<input type="file" id="f_file" accept="image/*"></span>' +
@@ -411,10 +413,10 @@
           '<small id="f_pinfo">' + (r.photo_url ? 'Photo actuelle conservée.' : 'La photo est réduite (~300 Ko) avant l\'envoi.') + '</small>' +
         '</div></div></div>' +
       (r.id ? '<p class="src">Tes modifications ne seront visibles que par toi (« ma version »). Les autres continuent à voir la recette d\'origine.</p>' : '') +
-      (r.id && estAdmin() ? '<div class="delzone"><button type="button" class="btn danger" data-act="delete">🗑 Supprimer cette recette</button><small>Visible seulement sur ton compte administrateur. Supprime la recette pour tout le monde (avec les versions personnelles).</small></div>' : '') +
+      (r.id && estAdmin() ? '<div class="delzone"><button type="button" class="btn danger" data-act="delete">🗑 Supprimer cette recette</button><small>' + H('supprimer') + ' Visible seulement sur ton compte administrateur. Supprime la recette pour tout le monde (avec les versions personnelles).</small></div>' : '') +
       '<div class="formbar">' +
         '<button type="button" class="btn" data-act="cancel">Annuler</button>' +
-        '<button type="submit" class="btn primary" id="f_save">Enregistrer</button></div>' +
+        '<button type="submit" class="btn primary" id="f_save">Enregistrer</button>' + H('enregistrer') + '</div>' +
       '</form>';
     renderStepsEditor();
     window.scrollTo(0, 0);
@@ -633,7 +635,7 @@
   // ---------- vues : connexion / installation / compte ----------
   function renderLogin(msg) {
     chrome(false, false);
-    app.innerHTML = '<form class="panel narrow" id="lform"><h2>Connexion</h2>' + (msg ? '<p class="src">' + esc(msg) + '</p>' : '') +
+    app.innerHTML = '<form class="panel narrow" id="lform"><h2>Connexion <button type="button" class="hbtn" data-help="installer" aria-label="Aide">?</button></h2>' + (msg ? '<p class="src">' + esc(msg) + '</p>' : '') +
       '<div class="field"><label for="l_nom">Nom</label><input type="text" id="l_nom" autocomplete="username" required value="' + esc(store.get('lr_nom', '')) + '"></div>' +
       '<div class="field"><label for="l_mdp">Mot de passe</label><input type="password" id="l_mdp" autocomplete="current-password" required></div>' +
       '<label class="keep"><input type="checkbox" id="l_keep" checked> Rester connecté sur cet appareil</label>' +
@@ -687,6 +689,7 @@
     app.innerHTML = '<div class="panel narrow"><h2>' + esc(S.user.nom) + '</h2><p class="src">' + (admin ? 'Administrateur : tu peux modifier toutes les fiches.' : 'Tu peux modifier tes fiches et lire celles des autres.') + '</p>' +
       '<div class="menu">' +
         (admin ? '<button class="btn" data-act="users">👥 Gérer les utilisateurs</button>' : '') +
+        '<button class="btn" data-help="__top">❓ Aide — mode d\'emploi complet</button>' +
         '<button class="btn" data-act="pwd">🔑 Changer mon mot de passe</button>' +
         '<button class="btn" data-act="book">📖 Livre / impression PDF</button>' +
         '<button class="btn danger" data-act="logout">Se déconnecter</button>' +
@@ -695,7 +698,7 @@
   }
   async function renderUsers() {
     chrome(true, false);
-    app.innerHTML = '<div class="panel"><h2>Utilisateurs</h2><div id="ulist" class="ulist"><div class="msg">Chargement…</div></div>' +
+    app.innerHTML = '<div class="panel"><h2>Utilisateurs' + H('utilisateurs') + '</h2><div id="ulist" class="ulist"><div class="msg">Chargement…</div></div>' +
       '<form id="uform" style="display:grid;gap:10px;border-top:1px solid var(--line);padding-top:14px">' +
         '<b>Ajouter un utilisateur</b>' +
         '<div class="row3"><div class="field"><label for="u_nom">Nom</label><input type="text" id="u_nom" required></div>' +
