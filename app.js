@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.6';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.7';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -765,14 +765,12 @@
     chrome(true, false);
     C.aRendre = false;
     if (!C.vuAff) C.vuAff = coursesVues();          // ce qui était déjà vu à l'ouverture : le reste est surligné
-    const standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
-    const proposerBadge = standalone && 'Notification' in window && Notification.permission === 'default';
     const partOuvert = $('cpart') && !$('cpart').hidden;
     app.innerHTML = '<div class="panel courses" id="courses">' +
       '<div class="ctop"><button class="btn sm" data-act="back">← Retour</button><h2>🛒 Courses' + H('courses') + '</h2></div>' +
       '<div class="cbtns"><button class="btn sm" data-act="cpartage">👥 Partager ma liste' + (C.mine.partage.length ? ' (' + C.mine.partage.length + ')' : '') + '</button></div>' +
       '<div id="cpart" class="cpart" hidden></div>' +
-      (proposerBadge ? '<button class="btn sm" data-act="cbadge">🔔 Afficher les nouveautés sur l\'icône de l\'appli</button>' : '') +
+      '<div class="cnotif">' + etatNotifHtml() + '</div>' +
       toutesListes().map(sectionListe).join('') +
       '<div class="src" id="csync"></div></div>';
     if (partOuvert) { renderPartage(); $('cpart').hidden = false; }
@@ -821,6 +819,65 @@
   function retirerCoches(btn) {
     const nom = btn.closest('.cliste').dataset.l;
     ajouterOp({ liste: nom, op: 'purge' }, 300); renderCourses();
+  }
+
+  // ---------- notifications push (Firebase Cloud Messaging) ----------
+  // Configuration publique de l'appli web Firebase (identifiants publics, pas des secrets).
+  const FB_CONFIG = { apiKey: 'AIzaSyB-yOaq7hlo3pbK4aF-r3M_dofgGeDuzUY', authDomain: 'livre-recettes-16f86.firebaseapp.com', projectId: 'livre-recettes-16f86',
+    storageBucket: 'livre-recettes-16f86.firebasestorage.app', messagingSenderId: '572379901432', appId: '1:572379901432:web:42454d0e9cf7ec67c4fa0d' };
+  const VAPID = 'BG1Cmx2bLLwnupxvhiuZeDa4yGaBtzWJF0pR6reX_xgMpJoGRKspO-wv3_gfFL0pVnuEzsWUOzvSb8mUozm9IDk';
+  const FB_JS = 'https://www.gstatic.com/firebasejs/10.12.2/';
+  const pushPossible = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const estIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  const appInstallee = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  function chargerScript(src) {
+    return new Promise((ok, ko) => {
+      if (document.querySelector('script[src="' + src + '"]')) return ok();
+      const s = document.createElement('script'); s.src = src; s.onload = () => ok(); s.onerror = () => ko(new Error('chargement impossible')); document.head.appendChild(s);
+    });
+  }
+  async function obtenirJetonPush() {
+    await chargerScript(FB_JS + 'firebase-app-compat.js');
+    await chargerScript(FB_JS + 'firebase-messaging-compat.js');
+    if (!window.firebase.apps.length) window.firebase.initializeApp(FB_CONFIG);
+    const reg = await navigator.serviceWorker.ready;
+    return window.firebase.messaging().getToken({ vapidKey: VAPID, serviceWorkerRegistration: reg });
+  }
+  const nomAppareil = () => (estIOS() ? 'iPhone/iPad' : /Android/.test(navigator.userAgent) ? 'Android' : 'Ordinateur') + ' · ' + new Date().toLocaleDateString('fr-BE');
+  function etatNotifHtml() {
+    if (!pushPossible()) return estIOS() && !appInstallee()
+      ? '<p class="src notifinfo">🔔 Pour recevoir les notifications sur iPhone, installe d\'abord l\'appli sur l\'écran d\'accueil (Partager → « Sur l\'écran d\'accueil ») et ouvre-la depuis l\'icône.' + H('notifications') + '</p>'
+      : '<p class="src notifinfo">🔔 Ce navigateur ne permet pas les notifications.</p>';
+    if (Notification.permission === 'granted' && store.get('lr_push_token', '')) return '<p class="src notifinfo">🔔 Notifications activées sur ce téléphone. <button class="btn sm" data-act="ntest">Tester</button>' + H('notifications') + '</p>';
+    if (Notification.permission === 'denied') return '<p class="src notifinfo">🔕 Notifications bloquées : autorise-les dans les réglages du téléphone (Réglages → Notifications → Recettes).' + H('notifications') + '</p>';
+    return '<button class="btn sm primary" data-act="nactiver">🔔 Activer les notifications</button>' + H('notifications');
+  }
+  async function activerNotifications() {
+    if (!pushPossible()) { toast('Notifications non disponibles ici.', true); return; }
+    let perm;
+    try { perm = await Notification.requestPermission(); } catch (e) { perm = 'denied'; }   // appelé directement par le toucher
+    if (perm !== 'granted') { toast('Notifications non autorisées.', true); render(); return; }
+    busy(true, 'Activation des notifications…');
+    try {
+      const t = await obtenirJetonPush();
+      if (!t) throw new Error('aucun jeton reçu');
+      await api('push_token', { token: t, appareil: nomAppareil() }, { essais: 1 });
+      store.set('lr_push_token', t);
+      toast('🔔 Notifications activées.');
+    } catch (e) { toast('Activation impossible : ' + e.message, true); }
+    finally { busy(false); render(); }
+  }
+  async function testerNotifications() {
+    try { const j = await api('push_test', {}, { essais: 1 }); toast(j.envoyes ? 'Notification envoyée : elle doit arriver dans quelques secondes.' : 'Aucun appareil enregistré.', !j.envoyes); }
+    catch (e) { toast(e.message, true); }
+  }
+  async function rafraichirJetonPush() {                     // une fois par ouverture : le jeton peut changer
+    if (!pushPossible() || Notification.permission !== 'granted' || !S.user || ss.get('lr_push_ok')) return;
+    try {
+      const t = await obtenirJetonPush();
+      if (t && t !== store.get('lr_push_token', '')) { await api('push_token', { token: t, appareil: nomAppareil() }, { essais: 1 }); store.set('lr_push_token', t); }
+      ss.set('lr_push_ok', '1');
+    } catch (e) { /* réessai à la prochaine ouverture */ }
   }
 
   // ---------- vues : connexion / installation / compte ----------
@@ -881,6 +938,7 @@
       '<div class="menu">' +
         (admin ? '<button class="btn" data-act="users">👥 Gérer les utilisateurs</button>' : '') +
         '<button class="btn" data-help="__top">❓ Aide — mode d\'emploi complet</button>' +
+        '<div class="cnotif">' + etatNotifHtml() + '</div>' +
         '<button class="btn" data-act="pwd">🔑 Changer mon mot de passe</button>' +
         '<button class="btn" data-act="book">📖 Livre / impression PDF</button>' +
         '<button class="btn danger" data-act="logout">Se déconnecter</button>' +
@@ -1010,7 +1068,8 @@
     if (act === 'cpartage') { const b = $('cpart'); if (b) { if (b.hidden) renderPartage(); b.hidden = !b.hidden; } return; }
     if (act === 'cvider') { viderCourses(actEl); return; }
     if (act === 'cpurge') { retirerCoches(actEl); return; }
-    if (act === 'cbadge') { try { Notification.requestPermission().then(() => { majPastille(); render(); }); } catch (err) { /* ignoré */ } return; }
+    if (act === 'nactiver') { activerNotifications(); return; }
+    if (act === 'ntest') { testerNotifications(); return; }
     if (act === 'edit') { S.view = 'form'; render(); return; }
     if (act === 'cancel') { S.view = S.id && S.data.some(r => String(r.id) === String(S.id)) ? 'recipe' : 'list'; render(); return; }
     if (act === 'delete') { supprimer(actEl); return; }
@@ -1130,7 +1189,10 @@
   if (S.user && tok() && cache && cache.recettes) { S.data = cache.recettes; S.listes = cache.listes || {}; S.maj = cache.maj || ''; marquerConnues(); render(); }
   majReseau(); majSync();
   if (S.user) { chargerCoursesLocal(); majPastille(); }
-  load(false).then(() => { synchroniser(true); if (S.user) { chargerCoursesLocal(); verifierCourses(true); } });
+  const ouvrirCourses = () => { if (!S.user) return; C.vuAff = null; S.view = 'courses'; render(); verifierCourses(true); };
+  if (location.hash === '#courses') { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignoré */ } if (S.user) ouvrirCourses(); }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.vue === 'courses') ouvrirCourses(); });
+  load(false).then(() => { synchroniser(true); if (S.user) { chargerCoursesLocal(); verifierCourses(true); rafraichirJetonPush(); } });
 
   if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 })();

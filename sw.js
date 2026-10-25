@@ -1,6 +1,6 @@
 /* Service worker : appli disponible hors ligne + cache des photos.
  * Les données (recettes) sont gérées par app.js (cache local), pas ici. */
-const VERSION = 'lr-v14';
+const VERSION = 'lr-v15';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'help.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 const PHOTOS = 'lr-photos';
 
@@ -41,4 +41,23 @@ self.addEventListener('fetch', e => {
       .then(r => { const copy = r.clone(); caches.open(VERSION).then(c => c.put(req, copy)); return r; })
       .catch(() => caches.match(req).then(r => r || caches.match('index.html'))));
   }
+});
+
+// ---------- notifications push (Firebase Cloud Messaging) ----------
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (x) { d = { data: { body: e.data ? e.data.text() : '' } }; }
+  const m = d.data || d.notification || d;
+  e.waitUntil(self.registration.showNotification(m.title || 'Livre de recettes', {
+    body: m.body || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png',
+    tag: 'courses', renotify: true, data: { vue: m.vue || 'courses' }
+  }).then(() => { if (self.navigator && self.navigator.setAppBadge) return self.navigator.setAppBadge().catch(() => {}); }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const vue = (e.notification.data && e.notification.data.vue) || 'courses';
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(ws => {
+    for (const w of ws) { if ('focus' in w) { w.postMessage({ vue: vue }); return w.focus(); } }
+    return self.clients.openWindow(new URL('./#' + vue, self.registration.scope).href);
+  }));
 });

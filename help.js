@@ -95,6 +95,12 @@
       '<p><b>Nouveautés</b> : quand quelqu\'un ajoute des articles à une liste que tu vois, une <b>pastille rouge</b> avec leur nombre apparaît sur 🛒 et ces lignes sont encadrées en rouge. La pastille disparaît dès que tu ouvres les courses. L\'appli vérifie toutes les 2 minutes quand elle est ouverte, et à chaque retour dans l\'appli.</p>' +
       '<p><b>Pastille sur l\'icône de l\'appli</b> (iPhone iOS 16.4 ou plus, appli installée) : touche « 🔔 Afficher les nouveautés sur l\'icône » et accepte. Le chiffre se met à jour quand l\'appli tourne.</p>' },
 
+    { id: 'notifications', titre: 'Notifications sur le téléphone', html:
+      '<p>Quand quelqu\'un ajoute des articles à une liste de courses que tu vois, tu reçois une <b>notification</b>, même appli fermée (« Julie a ajouté 3 articles : Pain, Lait, Œufs à la liste de Marc »). Elle arrive environ une minute après le dernier ajout, pour regrouper les articles.</p>' +
+      '<p><b>Activer</b> : bouton <b>🔔 Activer les notifications</b> dans les courses ou dans Mon compte, puis « Autoriser ». À faire <b>sur chaque téléphone</b>. « Tester » envoie une notification d\'essai.</p>' +
+      '<p><b>iPhone</b> : il faut iOS 16.4 ou plus et l\'appli <b>installée sur l\'écran d\'accueil</b> (ouverte depuis l\'icône, pas dans Safari).</p>' +
+      '<p>Toucher la notification ouvre directement les courses. Pour arrêter : Réglages du téléphone → Notifications → Recettes.</p>' },
+
     { groupe: 'Compte et administration' },
     { id: 'compte', titre: 'Mon compte', html:
       '<p>Avatar en haut à droite : changer de mot de passe, livre / PDF, aide, déconnexion, numéro de version.</p>' },

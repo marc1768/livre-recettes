@@ -292,3 +292,7 @@ img,video{max-width:100%}
 .courses .crow.new input{border-color:#d32f2f;background:#fdecec}
 .courses .cfoot{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .courses .cfoot:empty{display:none}
+
+/* v5.7 : notifications */
+.cnotif{margin:4px 0 6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.cnotif .notifinfo{margin:0}
