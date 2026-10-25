@@ -248,3 +248,33 @@ body.noscroll{overflow:hidden}
 .help .hsec ul{padding-left:20px}
 .help .htop{display:inline-block;margin-top:4px;font-size:13px;color:#8a7f72}
 @media print{.help{display:none!important}}
+
+/* v5.5 : affichage iPhone (pas de zoom ni de défilement horizontal) */
+html,body{max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+img,video{max-width:100%}
+@media (pointer:coarse){input,select,textarea{font-size:16px!important}}   /* < 16 px : l'iPhone zoome au toucher du champ */
+@media (max-width:480px){.lbl-l{display:none}}
+/* liste de courses */
+.cbtn{position:relative}
+.cbtn .dot{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#d32f2f;color:#fff;font-size:11px;font-weight:800;line-height:18px;text-align:center;box-shadow:0 0 0 2px #fff}
+.courses .ctop{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.courses .ctop h2{margin:0;font-size:20px}
+.courses .cbtns{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.courses .cpart{display:grid;gap:8px;background:#fff7ec;border:1px solid #f0d9b5;border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.courses .cpart label{display:flex;gap:8px;align-items:center}
+.courses .cpart small{color:var(--muted)}
+.courses .chead,.courses .crow{display:grid;grid-template-columns:minmax(0,1fr) 34% 38px;gap:6px;align-items:center}
+.courses .chead{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:0 2px 4px}
+.courses .clist{display:grid;gap:6px}
+.courses .crow input{width:100%;min-width:0;box-sizing:border-box;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.courses .ctrash{width:38px;height:38px;border:0;border-radius:10px;background:#fdecec;color:#d32f2f;font-size:18px;cursor:pointer}
+.courses .ctrash[hidden]{display:block;visibility:hidden}
+.courses #csync{margin:8px 0 4px;min-height:1.2em}
+.courses .cshare{margin-top:16px;border-top:1px solid var(--line);padding-top:10px}
+.courses .cshare h3{font-size:16px;margin:4px 0 8px}
+.courses .cshare small{font-weight:400;color:var(--muted)}
+.courses .cshare ul{list-style:none;margin:0;padding:0}
+.courses .cshare li{display:flex;gap:10px;align-items:center;padding:7px 4px;border-bottom:1px dashed var(--line)}
+.courses .cshare li span{flex:1}
+.courses .cshare li.new{background:#fdecec;border-radius:8px}
+.courses .cshare li i{font-style:normal;font-size:10px;font-weight:800;color:#fff;background:#d32f2f;border-radius:999px;padding:2px 6px}

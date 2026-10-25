@@ -27,6 +27,7 @@
       '<ul><li><b>↻</b> : recharge la liste depuis le serveur (pour voir tout de suite les ajouts des autres).</li>' +
       '<li><b>⬆ n</b> (orange) : n modifications attendent d\'être envoyées ; touche-le pour les envoyer maintenant.</li>' +
       '<li><b>📖 Livre</b> : le livre complet à imprimer ou enregistrer en PDF.</li>' +
+      '<li><b>🛒</b> : la liste de courses ; une pastille rouge indique le nombre d\'articles ajoutés par les personnes qui partagent leur liste avec toi.</li>' +
       '<li><b>+ Recette</b> : nouvelle recette.</li><li><b>Avatar</b> : ton compte, l\'aide, la déconnexion.</li></ul>' },
 
     { groupe: 'La fiche recette' },
@@ -79,6 +80,18 @@
       '<p>L\'envoi au serveur se fait au <b>retour à la liste</b>, avec le bouton orange <b>⬆</b>, au retour du réseau ou quand l\'appli passe en arrière-plan. Une fiche pas encore envoyée affiche « ⏳ Enregistrée sur le téléphone ». Hors ligne, rien n\'est perdu.</p>' },
     { id: 'supprimer', titre: 'Supprimer une recette', html:
       '<p>Réservé à l\'<b>administrateur</b> : dans le formulaire de modification, encadré rouge <b>« 🗑 Supprimer cette recette »</b>, à toucher deux fois pour confirmer. La recette disparaît pour tout le monde, versions personnelles comprises.</p>' },
+
+    { groupe: 'Liste de courses' },
+    { id: 'courses', titre: 'Liste de courses', html:
+      '<p>Bouton <b>🛒</b> en haut. Chaque ligne = <b>un ingrédient</b> et sa <b>quantité</b> (un seul des deux suffit). Dès qu\'une ligne est remplie, une nouvelle ligne vierge apparaît en dessous. Touche <b>Entrée</b> pour passer au champ suivant.</p>' +
+      '<p>Chaque ligne se modifie à volonté. La <b>poubelle rouge</b> 🗑 supprime la ligne ; les lignes du dessous remontent.</p>' +
+      '<p><b>🗑 Vider la liste</b> (toucher deux fois) efface tout et repart d\'une ligne vierge.</p>' +
+      '<p>La liste est enregistrée tout de suite sur le téléphone, puis envoyée au serveur. Hors ligne, elle part dès que le réseau revient.</p>' },
+    { id: 'partage', titre: 'Partager la liste de courses', html:
+      '<p><b>👥 Partager</b> : coche les personnes qui peuvent voir ta liste. Elles la voient sous la leur, en lecture seule (« Liste de Marc »).</p>' +
+      '<p>Tu ne vois la liste de quelqu\'un que s\'il l\'a partagée avec toi.</p>' +
+      '<p><b>Nouveautés</b> : quand une personne ajoute des articles à une liste partagée avec toi, une <b>pastille rouge</b> avec leur nombre apparaît sur 🛒 ; dans la liste, ces articles sont marqués <b>NOUVEAU</b>. La pastille disparaît dès que tu ouvres la liste. L\'appli vérifie toutes les 2 minutes quand elle est ouverte, et à chaque retour dans l\'appli.</p>' +
+      '<p><b>Pastille sur l\'icône de l\'appli</b> (iPhone avec iOS 16.4 ou plus, appli installée) : touche « 🔔 Afficher les nouveautés sur l\'icône » dans la liste et accepte. Le chiffre se met à jour quand l\'appli est ouverte ; il n\'y a pas encore de notification quand l\'appli est fermée.</p>' },
 
     { groupe: 'Compte et administration' },
     { id: 'compte', titre: 'Mon compte', html:
