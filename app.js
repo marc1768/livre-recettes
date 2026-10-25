@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.5';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.6';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -632,30 +632,88 @@
     } catch (e) { toast(e.message, true); } finally { S.busy = false; busy(false); }
   }
 
-  // ---------- liste de courses ----------
-  // Ma liste : modifiable, enregistrée tout de suite sur le téléphone puis envoyée au serveur (~1,5 s après la dernière frappe).
-  // Listes partagées avec moi : en lecture seule. Les éléments que je n'ai pas encore vus sont signalés (pastille rouge sur 🛒).
-  const C = { items: [], partage: [], maj: 0, partagees: [], utilisateurs: [], sale: false, envoi: false, err: '' };
-  const cleCourses = () => 'lr_courses_' + norm(S.user ? S.user.nom : '');
+  // ---------- liste de courses (v5.6 : listes familiales modifiables à plusieurs) ----------
+  // Ma liste + les listes partagées avec moi : toutes modifiables, article par article.
+  // Chaque modification est appliquée tout de suite sur le téléphone, mise en file (C.ops), puis envoyée
+  // au serveur qui la fusionne avec celles des autres (pas d'écrasement si deux personnes modifient en même temps).
+  const C = { mine: { items: [], partage: [] }, partagees: [], utilisateurs: [], ops: [], envoi: false, err: '', vuAff: null, aRendre: false };
+  const moiNom = () => (S.user ? S.user.nom : '');
+  const cleCourses = () => 'lr_courses2_' + norm(moiNom());
   const nouvelId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  function resetCourses() { Object.assign(C, { mine: { items: [], partage: [] }, partagees: [], utilisateurs: [], ops: [], envoi: false, err: '', vuAff: null }); }
   function chargerCoursesLocal() {
     const d = store.get(cleCourses(), null);
-    if (d) Object.assign(C, { items: d.items || [], partage: d.partage || [], maj: d.maj || 0, partagees: d.partagees || [], utilisateurs: d.utilisateurs || [], sale: !!d.sale });
+    if (d) Object.assign(C, { mine: d.mine || { items: [], partage: [] }, partagees: d.partagees || [], utilisateurs: d.utilisateurs || [], ops: (d.ops || []).map(o => { delete o.envoye; return o; }) });
   }
-  function sauverCoursesLocal() {
-    store.set(cleCourses(), { items: C.items, partage: C.partage, maj: C.maj, partagees: C.partagees, utilisateurs: C.utilisateurs, sale: C.sale });
+  function sauverCoursesLocal() { store.set(cleCourses(), { mine: C.mine, partagees: C.partagees, utilisateurs: C.utilisateurs, ops: C.ops }); }
+  const estMoi = nom => !nom || norm(nom) === norm(moiNom());
+  const listeDe = nom => (estMoi(nom) ? C.mine : C.partagees.find(l => l.nom === nom));
+  const toutesListes = () => [Object.assign({ nom: moiNom() }, C.mine)].concat(C.partagees);
+  function appliquerOp(o) {                                      // même logique que le serveur
+    if (o.op === 'partage') { C.mine.partage = (o.noms || []).slice(); return; }
+    const l = listeDe(o.liste); if (!l) return;
+    if (o.op === 'set') {
+      const it = o.item, i = l.items.findIndex(x => x.id === it.id);
+      if (!String(it.p || '').trim() && !String(it.q || '').trim()) { if (i >= 0) l.items.splice(i, 1); }
+      else if (i >= 0) Object.assign(l.items[i], { p: it.p, q: it.q, ok: !!it.ok });
+      else l.items.push({ id: it.id, p: it.p, q: it.q, ok: !!it.ok, by: moiNom() });
+    } else if (o.op === 'del') l.items = l.items.filter(x => x.id !== o.id);
+    else if (o.op === 'purge') l.items = l.items.filter(x => !x.ok);
+    else if (o.op === 'vider') l.items = [];
   }
+  let coursesT = null;
+  function ajouterOp(o, delai) {
+    if (o.op === 'set') {
+      const k = C.ops.findIndex(x => !x.envoye && x.op === 'set' && x.liste === o.liste && x.item.id === o.item.id);
+      if (k >= 0) C.ops[k] = o; else C.ops.push(o);
+    } else if (o.op === 'partage') {
+      C.ops = C.ops.filter(x => x.envoye || x.op !== 'partage'); C.ops.push(o);
+    } else C.ops.push(o);
+    appliquerOp(o); sauverCoursesLocal(); etatCourses();
+    clearTimeout(coursesT); coursesT = setTimeout(envoyerCourses, delai == null ? 1200 : delai);
+  }
+  function recevoir(j) {
+    C.mine = { items: (j.mine && j.mine.items) || [], partage: (j.mine && j.mine.partage) || [] };
+    C.partagees = j.partagees || []; C.utilisateurs = j.utilisateurs || [];
+    C.ops.forEach(appliquerOp);                                  // modifications pas encore envoyées
+    sauverCoursesLocal(); majPastille(); rafraichirCourses();
+  }
+  async function envoyerCourses() {
+    clearTimeout(coursesT);
+    if (!C.ops.length || C.envoi || !S.user || !tok()) return;
+    if (!navigator.onLine) { C.err = 'hors ligne'; etatCourses(); return; }
+    const lot = C.ops.filter(o => !o.envoye); if (!lot.length) return;
+    lot.forEach(o => { o.envoye = true; });
+    C.envoi = true; etatCourses();
+    try {
+      const j = await api('courses_ops', { ops: lot.map(o => { const c = Object.assign({}, o); delete c.envoye; return c; }) });
+      C.ops = C.ops.filter(o => !o.envoye); C.err = '';
+      C.envoi = false; recevoir(j);
+    } catch (e) {
+      lot.forEach(o => { delete o.envoye; }); C.err = e.message; C.envoi = false;
+    }
+    sauverCoursesLocal(); etatCourses();
+    if (C.ops.length && !C.err) { clearTimeout(coursesT); coursesT = setTimeout(envoyerCourses, 300); }
+  }
+  async function verifierCourses(silencieux) {
+    if (!S.user || !tok() || !navigator.onLine || C.envoi) return;
+    if (C.ops.length) return envoyerCourses();                    // l'envoi renvoie aussi l'état à jour
+    try { recevoir(await api('courses_get', {}, { essais: 1 })); }
+    catch (e) { if (!silencieux) toast(e.message, true); }
+  }
+  // ----- nouveautés : articles ajoutés par d'autres que je n'ai pas encore vus -----
   const coursesVues = () => store.get(cleCourses() + '_vu', {});
-  function nbNouveauxCourses() {
-    const vu = coursesVues();
-    return C.partagees.reduce((n, l) => n + (l.items || []).filter(it => (vu[l.nom] || []).indexOf(it.id) < 0).length, 0);
+  const auteurArticle = (it, l) => it.by || l.nom;
+  function nbNouveauxCourses(vu) {
+    vu = vu || coursesVues();
+    return toutesListes().reduce((n, l) => n + l.items.filter(it => !estMoi(auteurArticle(it, l)) && (vu[l.nom] || []).indexOf(it.id) < 0).length, 0);
   }
   function marquerCoursesVues() {
-    const vu = {}; C.partagees.forEach(l => { vu[l.nom] = (l.items || []).map(it => it.id); });
+    const vu = {}; toutesListes().forEach(l => { vu[l.nom] = l.items.map(it => it.id); });
     store.set(cleCourses() + '_vu', vu); majPastille();
   }
   function majPastille() {
-    const n = S.user ? nbNouveauxCourses() : 0;
+    const n = S.user && S.view !== 'courses' ? nbNouveauxCourses() : 0;
     const d = $('coursesDot');
     if (d) { d.hidden = !n; d.textContent = n > 9 ? '9+' : String(n); }
     try {                                            // pastille sur l'icône de l'appli (si le téléphone l'autorise)
@@ -663,118 +721,106 @@
       else if (!n && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
     } catch (e) { /* non pris en charge */ }
   }
-  let coursesT = null;
-  function programmerEnvoiCourses() {
-    C.sale = true; sauverCoursesLocal(); etatCourses();
-    clearTimeout(coursesT); coursesT = setTimeout(envoyerCourses, 1500);
-  }
-  async function envoyerCourses() {
-    clearTimeout(coursesT);
-    if (!C.sale || C.envoi || !S.user || !tok()) return;
-    if (!navigator.onLine) { C.err = 'hors ligne'; etatCourses(); return; }
-    C.envoi = true; etatCourses();
-    const items = C.items.filter(x => x.p || x.q).map(x => ({ id: x.id, p: x.p, q: x.q }));
-    const avant = JSON.stringify([items, C.partage]);
-    try {
-      const j = await api('courses_set', { items: items, partage: C.partage });
-      C.maj = j.maj; C.err = '';
-      if (JSON.stringify([C.items.filter(x => x.p || x.q).map(x => ({ id: x.id, p: x.p, q: x.q })), C.partage]) === avant) C.sale = false;
-    } catch (e) { C.err = e.message; }
-    C.envoi = false; sauverCoursesLocal(); etatCourses();
-    if (C.sale && !C.err) programmerEnvoiCourses();   // modifié pendant l'envoi : on renvoie
-  }
-  async function verifierCourses(silencieux) {
-    if (!S.user || !tok() || !navigator.onLine) return;
-    try {
-      const j = await api('courses_get', {}, { essais: 1 });
-      C.partagees = j.partagees || []; C.utilisateurs = j.utilisateurs || [];
-      if (!C.sale) { C.items = (j.mine.items || []).slice(); C.partage = j.mine.partage || []; C.maj = j.mine.maj || 0; }
-      sauverCoursesLocal(); majPastille();
-      if (S.view === 'courses') { if (!document.querySelector('#clist input:focus')) renderCourses(); else { renderPartagees(); } }
-      if (C.sale) envoyerCourses();
-    } catch (e) { if (!silencieux) toast(e.message, true); }
-  }
   function etatCourses() {
     const el = $('csync'); if (!el) return;
-    el.textContent = C.envoi ? '⏳ Envoi…' : C.sale ? (C.err ? '⚠ Enregistrée sur le téléphone, pas encore envoyée (' + C.err + ').' : '⏳ Enregistrée sur le téléphone…') :
-      (C.maj ? '✓ Liste enregistrée' + (C.partage.length ? ' et partagée avec ' + C.partage.join(', ') : '') + '.' : '');
+    el.textContent = C.envoi ? '⏳ Envoi…' : C.ops.length ? (C.err ? '⚠ Enregistré sur le téléphone, pas encore envoyé (' + C.err + ').' : '⏳ Enregistré sur le téléphone…') : '✓ À jour.';
   }
-  function ligneCourse(it, i) {
-    const vide = !it || (!it.p && !it.q);
-    return '<div class="crow" data-i="' + i + '">' +
+  function rafraichirCourses() {
+    if (S.view !== 'courses') return;
+    const f = document.activeElement;
+    if (f && f.closest && f.closest('.clist')) { C.aRendre = true; return; }   // ne pas déranger une saisie en cours
+    renderCourses();
+  }
+  // ----- affichage -----
+  function ligneCourse(it, l) {
+    const vide = !it;
+    const nouveau = it && C.vuAff && !estMoi(auteurArticle(it, l)) && (C.vuAff[l.nom] || []).indexOf(it.id) < 0;
+    return '<div class="crow' + (it && it.ok ? ' done' : '') + (nouveau ? ' new' : '') + '" data-id="' + (it ? esc(it.id) : '') + '"' +
+      (it && !estMoi(auteurArticle(it, l)) ? ' title="Ajouté par ' + esc(auteurArticle(it, l)) + '"' : '') + '>' +
       '<input class="cp" type="text" placeholder="Ingrédient" value="' + esc(it ? it.p : '') + '" enterkeyhint="next" autocapitalize="sentences">' +
       '<input class="cq" type="text" placeholder="Quantité" value="' + esc(it ? it.q : '') + '" enterkeyhint="next">' +
-      '<button type="button" class="ctrash" data-ctrash="' + i + '" aria-label="Supprimer la ligne"' + (vide ? ' hidden' : '') + '>🗑</button></div>';
+      '<button type="button" class="cok" aria-label="Acheté / disponible"' + (vide ? ' hidden' : '') + '>✓</button>' +
+      '<button type="button" class="ctrash" aria-label="Supprimer la ligne"' + (vide ? ' hidden' : '') + '>🗑</button></div>';
   }
-  function renderCourseRows() {
-    C.items = C.items.filter(x => x.p || x.q);
-    $('clist').innerHTML = C.items.map(ligneCourse).join('') + ligneCourse(null, C.items.length);
-  }
-  function renderPartagees() {
-    const box = $('cshared'); if (!box) return;
-    const vu = coursesVues();
-    const listes = C.partagees.filter(l => (l.items || []).length);
-    box.innerHTML = listes.length ? listes.map(l => '<div class="cshare"><h3>🛒 Liste de ' + esc(l.nom) + ' <small>(partagée avec toi, lecture seule)</small></h3><ul>' +
-      l.items.map(it => '<li' + ((vu[l.nom] || []).indexOf(it.id) < 0 ? ' class="new"' : '') + '><span>' + esc(it.p) + '</span><b>' + esc(it.q) + '</b>' +
-        ((vu[l.nom] || []).indexOf(it.id) < 0 ? '<i>NOUVEAU</i>' : '') + '</li>').join('') + '</ul></div>').join('')
-      : (C.partagees.length ? '' : '<p class="src">Personne ne partage encore sa liste avec toi.</p>');
+  function sectionListe(l) {
+    const moi = estMoi(l.nom);
+    const items = l.items.filter(x => !x.ok).concat(l.items.filter(x => x.ok));      // articles cochés en bas
+    const nbOk = l.items.filter(x => x.ok).length;
+    return '<section class="cliste" data-l="' + esc(l.nom) + '">' +
+      '<h3>' + (moi ? '🛒 Ma liste' : '🛒 Liste de ' + esc(l.nom)) +
+        '<small>' + (moi ? (C.mine.partage.length ? ' · partagée avec ' + esc(C.mine.partage.join(', ')) : ' · pas partagée') : ' · partagée avec toi, modifiable') + '</small></h3>' +
+      '<div class="chead"><span>Ingrédient</span><span>Quantité</span><span>✓</span><span></span></div>' +
+      '<div class="clist">' + items.map(it => ligneCourse(it, l)).join('') + ligneCourse(null, l) + '</div>' +
+      '<div class="cfoot">' + (nbOk ? '<button class="btn sm" data-act="cpurge">🧹 Retirer les articles cochés (' + nbOk + ')</button>' : '') +
+        (moi && l.items.length ? '<button class="btn sm danger" data-act="cvider">🗑 Vider ma liste</button>' : '') + '</div></section>';
   }
   function renderPartage() {
     const box = $('cpart');
     box.innerHTML = '<b>Partager ma liste avec :</b>' + (C.utilisateurs.length ? C.utilisateurs.map(n =>
-      '<label><input type="checkbox" data-cpart="' + esc(n) + '"' + (C.partage.indexOf(n) >= 0 ? ' checked' : '') + '> ' + esc(n) + '</label>').join('') :
+      '<label><input type="checkbox" data-cpart="' + esc(n) + '"' + (C.mine.partage.indexOf(n) >= 0 ? ' checked' : '') + '> ' + esc(n) + '</label>').join('') :
       '<span class="src">Aucun autre utilisateur.</span>') +
-      '<small>Les personnes cochées voient ta liste (sans pouvoir la modifier). Tu ne vois la leur que si elles la partagent avec toi.</small>';
+      '<small>Les personnes cochées voient ta liste et peuvent la modifier (ajouter, cocher, supprimer). Tu ne vois la leur que si elles la partagent avec toi.</small>';
   }
   function renderCourses() {
     chrome(true, false);
+    C.aRendre = false;
+    if (!C.vuAff) C.vuAff = coursesVues();          // ce qui était déjà vu à l'ouverture : le reste est surligné
     const standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
     const proposerBadge = standalone && 'Notification' in window && Notification.permission === 'default';
-    app.innerHTML = '<div class="panel courses">' +
-      '<div class="ctop"><button class="btn sm" data-act="back">← Retour</button><h2>🛒 Liste de courses' + H('courses') + '</h2></div>' +
-      '<div class="cbtns"><button class="btn sm" data-act="cpartage">👥 Partager' + (C.partage.length ? ' (' + C.partage.length + ')' : '') + '</button>' +
-        '<button class="btn sm danger" data-act="cvider">🗑 Vider la liste</button></div>' +
+    const partOuvert = $('cpart') && !$('cpart').hidden;
+    app.innerHTML = '<div class="panel courses" id="courses">' +
+      '<div class="ctop"><button class="btn sm" data-act="back">← Retour</button><h2>🛒 Courses' + H('courses') + '</h2></div>' +
+      '<div class="cbtns"><button class="btn sm" data-act="cpartage">👥 Partager ma liste' + (C.mine.partage.length ? ' (' + C.mine.partage.length + ')' : '') + '</button></div>' +
       '<div id="cpart" class="cpart" hidden></div>' +
       (proposerBadge ? '<button class="btn sm" data-act="cbadge">🔔 Afficher les nouveautés sur l\'icône de l\'appli</button>' : '') +
-      '<div class="chead"><span>Ingrédient</span><span>Quantité</span><span></span></div>' +
-      '<div id="clist" class="clist"></div><div class="src" id="csync"></div>' +
-      '<div id="cshared"></div></div>';
-    renderCourseRows(); renderPartagees(); etatCourses();
-    marquerCoursesVues();                 // la pastille disparaît dès que la liste est ouverte
-    const list = $('clist');
-    list.addEventListener('input', e => {
+      toutesListes().map(sectionListe).join('') +
+      '<div class="src" id="csync"></div></div>';
+    if (partOuvert) { renderPartage(); $('cpart').hidden = false; }
+    etatCourses(); marquerCoursesVues();
+    const box = $('courses');
+    const article = row => ({ id: row.dataset.id, p: row.querySelector('.cp').value, q: row.querySelector('.cq').value, ok: row.classList.contains('done') });
+    box.addEventListener('input', e => {
       const row = e.target.closest('.crow'); if (!row) return;
-      const i = +row.dataset.i;
-      if (i >= C.items.length) C.items.push({ id: nouvelId(), p: '', q: '' });
-      const it = C.items[i];
-      it.p = row.querySelector('.cp').value; it.q = row.querySelector('.cq').value;
+      const nom = row.closest('.cliste').dataset.l;
+      if (!row.dataset.id) row.dataset.id = nouvelId();
+      const it = article(row);
       const rempli = !!(it.p.trim() || it.q.trim());
-      row.querySelector('.ctrash').hidden = !rempli;
-      if (rempli && !row.nextElementSibling) list.insertAdjacentHTML('beforeend', ligneCourse(null, i + 1));   // nouvelle ligne vierge
-      programmerEnvoiCourses();
+      row.querySelector('.ctrash').hidden = !rempli; row.querySelector('.cok').hidden = !rempli;
+      if (rempli && !row.nextElementSibling) row.insertAdjacentHTML('afterend', ligneCourse(null, listeDe(nom)));   // nouvelle ligne vierge
+      ajouterOp({ liste: nom, op: 'set', item: it });
     });
-    list.addEventListener('keydown', e => {
-      if (e.key !== 'Enter') return;
+    box.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' || !e.target.closest('.crow')) return;
       e.preventDefault();
       const row = e.target.closest('.crow');
       if (e.target.classList.contains('cp')) row.querySelector('.cq').focus();
       else if (row.nextElementSibling) row.nextElementSibling.querySelector('.cp').focus();
     });
-    list.addEventListener('click', e => {
-      const b = e.target.closest('[data-ctrash]'); if (!b) return;
-      C.items.splice(+b.dataset.ctrash, 1);     // les lignes du dessous remontent
-      renderCourseRows(); programmerEnvoiCourses();
+    box.addEventListener('click', e => {
+      const row = e.target.closest('.crow'); if (!row || !row.dataset.id) return;
+      const nom = row.closest('.cliste').dataset.l;
+      if (e.target.closest('.cok')) { row.classList.toggle('done'); ajouterOp({ liste: nom, op: 'set', item: article(row) }, 300); }
+      else if (e.target.closest('.ctrash')) { ajouterOp({ liste: nom, op: 'del', id: row.dataset.id }, 300); row.remove(); }   // les lignes du dessous remontent
     });
+    box.addEventListener('focusout', () => setTimeout(() => {
+      const f = document.activeElement;
+      if (C.aRendre && !(f && f.closest && f.closest('.clist'))) renderCourses();
+    }, 50));
     $('cpart').addEventListener('change', e => {
       const n = e.target.dataset.cpart; if (!n) return;
-      C.partage = C.partage.filter(x => x !== n); if (e.target.checked) C.partage.push(n);
-      const b = document.querySelector('[data-act="cpartage"]'); if (b) b.textContent = '👥 Partager' + (C.partage.length ? ' (' + C.partage.length + ')' : '');
-      programmerEnvoiCourses();
+      const noms = C.mine.partage.filter(x => x !== n); if (e.target.checked) noms.push(n);
+      ajouterOp({ op: 'partage', noms: noms }, 300);
+      const b = document.querySelector('[data-act="cpartage"]'); if (b) b.textContent = '👥 Partager ma liste' + (noms.length ? ' (' + noms.length + ')' : '');
+      const h = document.querySelector('.cliste[data-l="' + CSS.escape(moiNom()) + '"] h3 small'); if (h) h.textContent = noms.length ? ' · partagée avec ' + noms.join(', ') : ' · pas partagée';
     });
   }
   function viderCourses(btn) {
-    if (!btn.dataset.confirm) { btn.dataset.confirm = '1'; btn.textContent = 'Confirmer : tout effacer'; setTimeout(() => { if (btn.isConnected) { delete btn.dataset.confirm; btn.textContent = '🗑 Vider la liste'; } }, 5000); return; }
-    C.items = []; renderCourses(); programmerEnvoiCourses(); toast('Liste vidée.');
+    if (!btn.dataset.confirm) { btn.dataset.confirm = '1'; btn.textContent = 'Confirmer : tout effacer'; setTimeout(() => { if (btn.isConnected) { delete btn.dataset.confirm; btn.textContent = '🗑 Vider ma liste'; } }, 5000); return; }
+    ajouterOp({ liste: moiNom(), op: 'vider' }, 300); renderCourses(); toast('Liste vidée.');
+  }
+  function retirerCoches(btn) {
+    const nom = btn.closest('.cliste').dataset.l;
+    ajouterOp({ liste: nom, op: 'purge' }, 300); renderCourses();
   }
 
   // ---------- vues : connexion / installation / compte ----------
@@ -880,7 +926,7 @@
     if (rester === false) { ss.set('lr_tok', j.token); setCfg({ token: '' }); }
     else { ss.set('lr_tok', ''); setCfg({ token: j.token }); }
     S.user = j.user; store.set('lr_user', S.user);
-    Object.assign(C, { items: [], partage: [], maj: 0, partagees: [], utilisateurs: [], sale: false, err: '' }); chargerCoursesLocal(); majPastille(); verifierCourses(true);
+    resetCourses(); chargerCoursesLocal(); majPastille(); verifierCourses(true);
     if (S.user.doit_changer) { S.view = 'password'; renderPassword(true); return; }
     S.view = 'list'; load(true);
   }
@@ -959,10 +1005,11 @@
     }
     const actEl = t.closest('[data-act]');
     const act = actEl && actEl.getAttribute('data-act');
-    if (act === 'back') { S.view = 'list'; render(); synchroniser(false); return; }
+    if (act === 'back') { S.view = 'list'; render(); synchroniser(false); majPastille(); return; }
     if (act === 'nouv') { S.nouv = !S.nouv; render(); return; }
     if (act === 'cpartage') { const b = $('cpart'); if (b) { if (b.hidden) renderPartage(); b.hidden = !b.hidden; } return; }
     if (act === 'cvider') { viderCourses(actEl); return; }
+    if (act === 'cpurge') { retirerCoches(actEl); return; }
     if (act === 'cbadge') { try { Notification.requestPermission().then(() => { majPastille(); render(); }); } catch (err) { /* ignoré */ } return; }
     if (act === 'edit') { S.view = 'form'; render(); return; }
     if (act === 'cancel') { S.view = S.id && S.data.some(r => String(r.id) === String(S.id)) ? 'recipe' : 'list'; render(); return; }
@@ -976,7 +1023,7 @@
     if (act === 'book') { S.view = 'book'; render(); return; }
     if (act === 'logout') { deconnecter(false); return; }
     if (t.closest('#btnBook')) { S.view = 'book'; render(); return; }
-    if (t.closest('#btnCourses')) { S.view = 'courses'; render(); verifierCourses(true); return; }
+    if (t.closest('#btnCourses')) { C.vuAff = null; S.view = 'courses'; render(); verifierCourses(true); return; }
     if (t.id === 'btnNew') { S.id = null; S.view = 'form'; render(); return; }
     if (t.id === 'btnMe') { S.view = 'me'; render(); return; }
     if (t.id === 'btnReload') { load(true); return; }

@@ -263,7 +263,7 @@ img,video{max-width:100%}
 .courses .cpart{display:grid;gap:8px;background:#fff7ec;border:1px solid #f0d9b5;border-radius:12px;padding:10px 12px;margin-bottom:12px}
 .courses .cpart label{display:flex;gap:8px;align-items:center}
 .courses .cpart small{color:var(--muted)}
-.courses .chead,.courses .crow{display:grid;grid-template-columns:minmax(0,1fr) 34% 38px;gap:6px;align-items:center}
+.courses .chead,.courses .crow{display:grid;grid-template-columns:minmax(0,1fr) 28% 36px 36px;gap:5px;align-items:center}
 .courses .chead{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:0 2px 4px}
 .courses .clist{display:grid;gap:6px}
 .courses .crow input{width:100%;min-width:0;box-sizing:border-box;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
@@ -278,3 +278,17 @@ img,video{max-width:100%}
 .courses .cshare li span{flex:1}
 .courses .cshare li.new{background:#fdecec;border-radius:8px}
 .courses .cshare li i{font-style:normal;font-size:10px;font-weight:800;color:#fff;background:#d32f2f;border-radius:999px;padding:2px 6px}
+
+/* v5.6 : listes modifiables à plusieurs, case acheté */
+.courses .cliste{margin-top:14px;padding-top:10px;border-top:1px solid var(--line)}
+.courses .cliste h3{font-size:17px;margin:0 0 8px}
+.courses .cliste h3 small{font-size:12px;font-weight:400;color:var(--muted)}
+.courses .chead span:nth-child(3){text-align:center}
+.courses .ctrash,.courses .cok{width:36px;height:36px}
+.courses .cok{border:2px solid #9bbf9b;border-radius:10px;background:#fff;color:transparent;font-size:18px;font-weight:900;cursor:pointer;padding:0}
+.courses .cok[hidden],.courses .ctrash[hidden]{display:block;visibility:hidden}
+.courses .crow.done .cok{background:#2e7d32;border-color:#2e7d32;color:#fff}
+.courses .crow.done input{text-decoration:line-through;color:var(--muted);background:#f3f6f3}
+.courses .crow.new input{border-color:#d32f2f;background:#fdecec}
+.courses .cfoot{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.courses .cfoot:empty{display:none}

@@ -83,15 +83,17 @@
 
     { groupe: 'Liste de courses' },
     { id: 'courses', titre: 'Liste de courses', html:
-      '<p>Bouton <b>🛒</b> en haut. Chaque ligne = <b>un ingrédient</b> et sa <b>quantité</b> (un seul des deux suffit). Dès qu\'une ligne est remplie, une nouvelle ligne vierge apparaît en dessous. Touche <b>Entrée</b> pour passer au champ suivant.</p>' +
-      '<p>Chaque ligne se modifie à volonté. La <b>poubelle rouge</b> 🗑 supprime la ligne ; les lignes du dessous remontent.</p>' +
-      '<p><b>🗑 Vider la liste</b> (toucher deux fois) efface tout et repart d\'une ligne vierge.</p>' +
-      '<p>La liste est enregistrée tout de suite sur le téléphone, puis envoyée au serveur. Hors ligne, elle part dès que le réseau revient.</p>' },
+      '<p>Bouton <b>🛒</b> en haut. Tu y trouves <b>ta liste</b> et, en dessous, les listes que d\'autres partagent avec toi. <b>Toutes sont modifiables</b> : c\'est la liste de la famille.</p>' +
+      '<p>Chaque ligne = <b>un ingrédient</b> et sa <b>quantité</b> (un seul des deux suffit). Dès qu\'une ligne est remplie, une ligne vierge apparaît en dessous. <b>Entrée</b> passe au champ suivant.</p>' +
+      '<ul><li><b>✓</b> (case verte) : article <b>acheté / déjà disponible</b>. La ligne est barrée pour tout le monde : personne ne l\'achète deux fois. Retouche pour décocher.</li>' +
+      '<li><b>🗑</b> : supprime la ligne ; les lignes du dessous remontent.</li>' +
+      '<li><b>🧹 Retirer les articles cochés</b> : après les courses, enlève d\'un coup tout ce qui est coché.</li>' +
+      '<li><b>🗑 Vider ma liste</b> (toucher deux fois) : efface toute ta liste (seulement la tienne).</li></ul>' +
+      '<p>Les modifications sont enregistrées tout de suite sur le téléphone puis envoyées ; si deux personnes modifient en même temps, les deux modifications sont gardées. Hors ligne, elles partent dès que le réseau revient.</p>' },
     { id: 'partage', titre: 'Partager la liste de courses', html:
-      '<p><b>👥 Partager</b> : coche les personnes qui peuvent voir ta liste. Elles la voient sous la leur, en lecture seule (« Liste de Marc »).</p>' +
-      '<p>Tu ne vois la liste de quelqu\'un que s\'il l\'a partagée avec toi.</p>' +
-      '<p><b>Nouveautés</b> : quand une personne ajoute des articles à une liste partagée avec toi, une <b>pastille rouge</b> avec leur nombre apparaît sur 🛒 ; dans la liste, ces articles sont marqués <b>NOUVEAU</b>. La pastille disparaît dès que tu ouvres la liste. L\'appli vérifie toutes les 2 minutes quand elle est ouverte, et à chaque retour dans l\'appli.</p>' +
-      '<p><b>Pastille sur l\'icône de l\'appli</b> (iPhone avec iOS 16.4 ou plus, appli installée) : touche « 🔔 Afficher les nouveautés sur l\'icône » dans la liste et accepte. Le chiffre se met à jour quand l\'appli est ouverte ; il n\'y a pas encore de notification quand l\'appli est fermée.</p>' },
+      '<p><b>👥 Partager ma liste</b> : coche les personnes de la famille. Elles voient ta liste et peuvent la <b>modifier</b> (ajouter, cocher, supprimer). Tu ne vois la liste de quelqu\'un que s\'il l\'a partagée avec toi.</p>' +
+      '<p><b>Nouveautés</b> : quand quelqu\'un ajoute des articles à une liste que tu vois, une <b>pastille rouge</b> avec leur nombre apparaît sur 🛒 et ces lignes sont encadrées en rouge. La pastille disparaît dès que tu ouvres les courses. L\'appli vérifie toutes les 2 minutes quand elle est ouverte, et à chaque retour dans l\'appli.</p>' +
+      '<p><b>Pastille sur l\'icône de l\'appli</b> (iPhone iOS 16.4 ou plus, appli installée) : touche « 🔔 Afficher les nouveautés sur l\'icône » et accepte. Le chiffre se met à jour quand l\'appli tourne.</p>' },
 
     { groupe: 'Compte et administration' },
     { id: 'compte', titre: 'Mon compte', html:
