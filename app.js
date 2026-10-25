@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.7.1';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.8';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -152,7 +152,7 @@
         let j;
         try { j = JSON.parse(txt); } catch (e) { throw new Error('REPONSE'); }
         if (!j.ok) {
-          if (/^SESSION:/.test(j.error || '')) { deconnecter(true); throw new Error(j.error.replace(/^SESSION:\s*/, '')); }
+          if (/^SESSION:/.test(j.error || '')) { if (!opts.garderSession) deconnecter(true); throw new Error(j.error.replace(/^SESSION:\s*/, '')); }
           const err = new Error(j.error || 'Erreur API'); err.api = true; throw err;
         }
         return j;
@@ -236,8 +236,8 @@
     chrome(true, true);
     const list = filtered();
     const prenom = S.user ? S.user.nom : '';
-    let h = '<section class="hero"><h2>Bonjour ' + esc(prenom) + ' !</h2><p>' + S.data.length + ' recette' + (S.data.length > 1 ? 's' : '') +
-      ' dans le livre' + (S.maj ? ' · mis à jour ' + esc(S.maj) : '') + ' · appli ' + APP_VERSION + ' · <a href="#" class="hhero" data-help="__top">❓ Aide</a></p></section>';
+    let h = '<section class="hero"><h2>Bonjour ' + esc(prenom) + ' !</h2><p>' + S.data.length + ' recette' + (S.data.length > 1 ? 's' : '') + ' dans le livre</p>' +
+      '<div class="hmeta"><span>Version ' + APP_VERSION + (S.maj ? '<br>mise à jour ' + esc(S.maj) : '') + '</span><button type="button" class="hhero" data-help="__top">Aide</button></div></section>';
     const nn = nbNouvelles();
     if (nn) h += '<button class="newbar" data-act="nouv">🔴 ' + nn + (nn > 1 ? ' nouvelles recettes' : ' nouvelle recette') +
       (S.nouv ? ' — <u>tout afficher</u>' : ' — <u>voir</u>') + '</button>';
@@ -875,7 +875,7 @@
     if (!pushPossible() || Notification.permission !== 'granted' || !S.user || ss.get('lr_push_ok')) return;
     try {
       const t = await obtenirJetonPush();
-      if (t && t !== store.get('lr_push_token', '')) { await api('push_token', { jeton_push: t, appareil: nomAppareil() }, { essais: 1 }); store.set('lr_push_token', t); }
+      if (t && t !== store.get('lr_push_token', '')) { await api('push_token', { jeton_push: t, appareil: nomAppareil() }, { essais: 1, garderSession: true }); store.set('lr_push_token', t); }
       ss.set('lr_push_ok', '1');
     } catch (e) { /* réessai à la prochaine ouverture */ }
   }
@@ -894,7 +894,7 @@
         const rester = $('l_keep').checked;
         const j = await api('login', { nom: $('l_nom').value.trim(), mdp: $('l_mdp').value, rester: rester }, { essais: 1 });
         store.set('lr_nom', $('l_nom').value.trim());
-        connecte(j, rester);
+        await connecte(j, rester);
       } catch (err) { toast(err.message, true); } finally { busy(false); }
     });
   }
@@ -980,13 +980,18 @@
     } catch (err) { $('ulist').innerHTML = '<div class="msg err">' + esc(err.message) + '</div>'; }
   }
 
-  function connecte(j, rester) {
+  async function connecte(j, rester) {
     if (rester === false) { ss.set('lr_tok', j.token); setCfg({ token: '' }); }
     else { ss.set('lr_tok', ''); setCfg({ token: j.token }); }
     S.user = j.user; store.set('lr_user', S.user);
     resetCourses(); chargerCoursesLocal(); majPastille(); verifierCourses(true);
     if (S.user.doit_changer) { S.view = 'password'; renderPassword(true); return; }
-    S.view = 'list'; load(true);
+    S.view = 'list';
+    chrome(true, false);                                  // écran d'attente : on ne revoit pas le formulaire de connexion
+    app.innerHTML = '<div class="loading"><div class="spin"></div><p>Chargement du livre de recettes…</p><small>Quelques secondes, ne touche à rien.</small></div>';
+    busy(false);
+    await load(true);
+    rafraichirJetonPush();
   }
   function deconnecter(silencieux) {
     setCfg({ token: '' }); ss.set('lr_tok', ''); store.del('lr_user'); store.del('lr_cache');

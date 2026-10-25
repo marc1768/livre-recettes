@@ -1,7 +1,7 @@
 /* Service worker : appli disponible hors ligne + cache des photos.
  * Les données (recettes) sont gérées par app.js (cache local), pas ici. */
-const VERSION = 'lr-v16';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'help.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
+const VERSION = 'lr-v17';
+const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'help.js', 'manifest.webmanifest', 'icons/icon-192.png?v=2', 'icons/icon-512.png?v=2'];
 const PHOTOS = 'lr-photos';
 
 self.addEventListener('install', e => {
@@ -37,7 +37,7 @@ self.addEventListener('fetch', e => {
 
   // Fichiers de l'appli : réseau d'abord (mises à jour), cache si hors ligne
   if (url.origin === location.origin) {
-    e.respondWith(fetch(req)
+    e.respondWith(fetch(req, { cache: 'no-cache' })          // toujours revalider : les mises à jour arrivent tout de suite
       .then(r => { const copy = r.clone(); caches.open(VERSION).then(c => c.put(req, copy)); return r; })
       .catch(() => caches.match(req).then(r => r || caches.match('index.html'))));
   }
