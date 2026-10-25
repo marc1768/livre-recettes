@@ -1,7 +1,7 @@
 /* Service worker : appli disponible hors ligne + cache des photos.
  * Les données (recettes) sont gérées par app.js (cache local), pas ici. */
-const VERSION = 'lr-v18';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'help.js', 'manifest.webmanifest', 'icons/icon-192.png?v=2', 'icons/icon-512.png?v=2'];
+const VERSION = 'lr-v19';
+const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'help.js', 'manifest.webmanifest', 'icons/icon-192.png?v=3', 'icons/icon-512.png?v=3'];
 const PHOTOS = 'lr-photos';
 
 self.addEventListener('install', e => {
