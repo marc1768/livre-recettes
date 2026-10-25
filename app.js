@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.11';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.12';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -393,7 +393,7 @@
     editDevice = pr.device || L.appareils[0];
     editSteps = pr.steps.length ? pr.steps : [{ label: 'Cuisson', temp: 180, time: 12, time2: 0, rem: '' }];
     const devs = L.appareils.slice(); if (devs.indexOf(editDevice) < 0) devs.push(editDevice);
-    editPhotos = imp ? (imp.photos || []).slice(0, 1).map(photoItem) : photosDe(r).map(photoItem);
+    editPhotos = imp ? (imp.photos || []).slice(0, MAX_PHOTOS).map(photoItem) : photosDe(r).map(photoItem);
     const auteurs = []; S.data.forEach(x => { if (x.auteur && auteurs.indexOf(x.auteur) < 0) auteurs.push(x.auteur); });
     const doublon = imp && S.data.find(x => norm(x.titre) === norm(imp.titre));
     app.innerHTML =
@@ -554,6 +554,9 @@
     const enLigne = editPhotos.filter(p => p.url).map(p => p.url);
     const aEnvoyer = editPhotos.filter(p => p.data).map(p => p.data);
     rec.photo_url = enLigne.join('\n');
+    // Création avec des photos à envoyer : toute la liste (liens + photos) part avec la 1re photo envoyée,
+    // pour qu'elle soit enregistrée sur la recette d'origine et pas dans « ma version ».
+    if (!ancienne.id && aEnvoyer.length) rec.photo_url = '';
     const local = editPhotos.map(p => p.url || p.data).join('\n');
 
     const creation = !ancienne.id;
