@@ -85,6 +85,11 @@
     { id: 'enregistrer', titre: 'Enregistrer et envoi', html:
       '<p><b>Enregistrer</b> est immédiat : la recette est mise à jour sur le téléphone.</p>' +
       '<p>L\'envoi au serveur se fait au <b>retour à la liste</b>, avec le bouton orange <b>⬆</b>, au retour du réseau ou quand l\'appli passe en arrière-plan. Une fiche pas encore envoyée affiche « ⏳ Enregistrée sur le téléphone ». Hors ligne, rien n\'est perdu.</p>' },
+    { id: 'admin', titre: 'Corriger une recette pour tout le monde (admin)', html:
+      '<p>Sur le compte administrateur, le formulaire d\'une recette existante a deux boutons :</p>' +
+      '<p><b>👤 Pour moi</b> : comme pour tout le monde, la modification ne va que dans ta « ma version ».</p>' +
+      '<p><b>🌍 Pour tout le monde</b> : la recette d\'origine est corrigée pour tous (titre, catégorie, réglages, ingrédients, statut, <b>auteur</b>, photos…). Pratique pour corriger un auteur mal écrit et garder le filtre « Ajoutées par » propre. Ta « ma version » de cette recette est alors effacée.</p>' +
+      '<p>Si une autre personne a sa propre « ma version », ses modifications à elle restent prioritaires chez elle.</p>' },
     { id: 'importer', titre: 'Importer une recette avec Claude (/recette)', html:
       '<p>Dans une conversation Claude, tape <b>/recette</b> et donne une <b>photo</b> (livre, carnet, écran), un <b>PDF</b> ou le <b>lien</b> d\'une recette en ligne. Claude lit tout et t\'affiche un <b>éditeur</b> pour corriger la recette et ajouter tes photos.</p>' +
       '<p>Dans l\'éditeur, touche <b>Valider la recette</b>, puis <b>📋 Copier pour le livre</b>. Ici, touche <b>+ Recette</b>, puis <b>📋 Coller une recette préparée par Claude</b>. Si le téléphone ne colle pas tout seul, une case s\'ouvre : appui long, Coller, puis <b>Importer</b>. Sans photo de ton appareil, le bouton <b>Ouvrir dans le livre</b> de l\'éditeur marche aussi.</p>' +

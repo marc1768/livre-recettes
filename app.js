@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.17';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.18';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -435,7 +435,7 @@
     const devs = L.appareils.slice(); if (devs.indexOf(editDevice) < 0) devs.push(editDevice);
     editPhotos = imp ? (imp.photos || []).slice(0, MAX_PHOTOS).map(photoItem) : photosDe(r).map(photoItem);
     // photo principale : seul le créateur de la recette peut la changer (pour tout le monde)
-    principaleBloquee = !!(r.id && r.peut_photo === false && editPhotos.length);
+    principaleBloquee = !!(r.id && r.peut_photo === false && editPhotos.length && !estAdmin());   // l'admin peut tout changer (« pour tout le monde »)
     nVerrou = principaleBloquee ? Math.min(editPhotos.length, r.photos_origine > 0 ? r.photos_origine : 1) : 0;   // photos du créateur : intouchables
     const auteurs = []; S.data.forEach(x => { if (x.auteur && auteurs.indexOf(x.auteur) < 0) auteurs.push(x.auteur); });
     const doublon = imp && S.data.find(x => norm(x.titre) === norm(imp.titre));
@@ -452,7 +452,7 @@
         '<div class="field"><label for="f_pers">Personnes</label><input type="number" min="1" id="f_pers" value="' + esc(r.personnes || 2) + '"></div>' +
         '<div class="field"><label for="f_temps">Temps total (min)</label><input type="number" min="0" id="f_temps" value="' + esc(r.temps_min) + '"></div>' +
       '</div>' +
-      (!r.id && estAdmin() ? '<div class="field"><label for="f_aut">Auteur' + H('importer') + '</label><input type="text" id="f_aut" list="f_autl" value="' + esc(r.auteur || S.user.nom) + '"><datalist id="f_autl">' + auteurs.map(a => '<option value="' + esc(a) + '">').join('') + '</datalist></div>' : '') +
+      (estAdmin() ? '<div class="field"><label for="f_aut">Auteur' + H(r.id ? 'admin' : 'importer') + (r.id ? ' <small>(changé seulement avec « pour tout le monde »)</small>' : '') + '</label><input type="text" id="f_aut" list="f_autl" value="' + esc(r.auteur || S.user.nom) + '"><datalist id="f_autl">' + auteurs.map(a => '<option value="' + esc(a) + '">').join('') + '</datalist></div>' : '') +
       '<div class="field"><span class="lbl">Modes de cuisson' + H('modes') + '</span><div class="checks">' +
         allModes.map(m => '<label><input type="checkbox" name="mode" value="' + esc(m) + '"' + (mode.indexOf(m) >= 0 ? ' checked' : '') + '>' + esc(m) + '</label>').join('') + '</div></div>' +
       '<div class="field"><span class="lbl">Réglages de cuisson' + H('reglages') + '</span>' +
@@ -476,12 +476,15 @@
           '<div class="urlrow"><input type="url" id="f_url" placeholder="… ou coller un lien (Drive ou image web)"><button type="button" class="btn sm" id="f_addurl">Ajouter</button></div>' +
           '<small id="f_pinfo">La première photo est la photo principale. Les photos sont réduites (~300 Ko) avant l\'envoi.</small>' +
         '</div></div>' +
-      (r.id ? (r.peut_photo ? '<p class="src">📷 Tu as créé cette recette : tes photos et la photo principale sont visibles par tout le monde. Tes autres modifications ne sont visibles que par toi (« ma version »).</p>'
+      (r.id && estAdmin() ? '<p class="src adminbar">🛡 <b>Administrateur</b> : « 👤 Pour moi » enregistre ta version personnelle ; « 🌍 Pour tout le monde » corrige la recette d\'origine (tous les champs, auteur et photos compris) pour tous.</p>' :
+       r.id ? (r.peut_photo ? '<p class="src">📷 Tu as créé cette recette : tes photos et la photo principale sont visibles par tout le monde. Tes autres modifications ne sont visibles que par toi (« ma version »).</p>'
         : '<p class="src">Tes modifications ne seront visibles que par toi (« ma version »), y compris les photos que tu ajoutes.' + (principaleBloquee ? ' 🔒 La photo principale et les photos de ' + esc(r.auteur || 'la recette d\'origine') + ' ne peuvent être changées que par ' + esc(r.auteur || 'la personne qui a créé la recette') + '.' : '') + '</p>') : '') +
       (r.id && estAdmin() ? '<div class="delzone"><button type="button" class="btn danger" data-act="delete">🗑 Supprimer cette recette</button><small>' + H('supprimer') + ' Visible seulement sur ton compte administrateur. Supprime la recette pour tout le monde (avec les versions personnelles).</small></div>' : '') +
       '<div class="formbar">' +
         '<button type="button" class="btn" data-act="cancel">Annuler</button>' +
-        '<button type="submit" class="btn primary" id="f_save">Enregistrer</button>' + H('enregistrer') + '</div>' +
+        (r.id && estAdmin()
+          ? '<button type="submit" class="btn" id="f_save" data-pour="moi">👤 Pour moi</button><button type="submit" class="btn primary" id="f_saveall" data-pour="tous">🌍 Pour tout le monde</button>' + H('admin')
+          : '<button type="submit" class="btn primary" id="f_save">Enregistrer</button>' + H('enregistrer')) + '</div>' +
       '</form>';
     renderStepsEditor();
     window.scrollTo(0, 0);
@@ -527,7 +530,11 @@
       else { const p = editPhotos.splice(+b.dataset.pmain, 1)[0]; editPhotos.unshift(p); }
       renderPhotosEd();
     });
-    $('form').addEventListener('submit', e => { e.preventDefault(); enregistrer(r); });
+    $('form').addEventListener('submit', e => {
+      e.preventDefault();
+      const pour = e.submitter && e.submitter.dataset ? e.submitter.dataset.pour : '';
+      enregistrer(r, pour === 'tous');
+    });
   }
 
   const photoItem = u => (/^data:/.test(u) ? { data: u } : { url: u });
@@ -580,7 +587,7 @@
     b.title = n + ' modification(s) à envoyer — toucher pour envoyer maintenant';
   }
 
-  function enregistrer(ancienne) {
+  function enregistrer(ancienne, pourTous) {
     const modes = Array.from(document.querySelectorAll('input[name=mode]:checked')).map(x => x.value);
     const rec = {
       titre: $('f_titre').value.trim(),
@@ -596,7 +603,7 @@
       notes_marc: $('f_notes').value.trim()
     };
     if (!rec.titre) { toast('Le titre est obligatoire.', true); return; }
-    if ($('f_aut') && $('f_aut').value.trim()) rec.auteur = nomPropre($('f_aut').value);
+    if ($('f_aut') && $('f_aut').value.trim() && (!ancienne.id || pourTous)) rec.auteur = nomPropre($('f_aut').value);
     // photos : celles déjà en ligne restent dans photo_url, les nouvelles (data) sont envoyées par la file
     const lienEnCours = $('f_url').value.trim();
     if (lienEnCours && editPhotos.length < MAX_PHOTOS) editPhotos.push({ url: lienEnCours });
@@ -624,6 +631,7 @@
     if (!creation && !('photoBase' in it)) it.photoBase = photosOrigine(ancienne);
     let k = 0; it.ordre = editPhotos.map(p => (p.url ? p.url : '#' + (k++)));   // ordre voulu (photos à envoyer = #0, #1…)
     it.photos = aEnvoyer; delete it.photo;
+    if (!creation) it.pourTous = !!pourTous;
     setOutbox(q);
 
     // copie locale affichée tout de suite
@@ -632,11 +640,12 @@
     loc.photo_url = local;
     if (creation) S.draft = null;
     if (creation) Object.assign(loc, { auteur: nomPropre(rec.auteur || S.user.nom), peut_modifier: true, peut_supprimer: true, note_moyenne: 0, note_nb: 0, ma_note: 0, date_ajout: today });
+    else if (pourTous) Object.assign(loc, { ma_version: false, ma_version_date: '' });
     else if (String(id).indexOf('TMP') !== 0) Object.assign(loc, { ma_version: true, ma_version_date: today });
     const i = S.data.findIndex(x => String(x.id) === String(id));
     if (i >= 0) S.data[i] = loc; else S.data.push(loc);
     saveCache();
-    toast('✓ Enregistré — envoi au retour à la liste');
+    toast(pourTous ? '✓ Enregistré pour tout le monde — envoi au retour à la liste' : '✓ Enregistré — envoi au retour à la liste');
     S.id = id; S.view = 'recipe'; render();
   }
 
@@ -682,6 +691,7 @@
             Object.assign(it, k || {});
           } else if (Object.keys(it.rec).length) {
             const pb = baseDe(it), env = Object.assign({}, it.rec, { id: it.id });
+            if (it.pourTous) env.pour_tous = true;
             if (pb !== undefined && 'photo_url' in env) env.photo_base = pb;
             const saved = (await api('save', { recette: env })).recette;
             avertirConflit(saved);
@@ -698,6 +708,7 @@
             const liste = it.ordre ? it.ordre.map(x => (x.charAt(0) === '#' ? urls[+x.slice(1)] : x)).filter(Boolean)
               : lines(saved && saved.photo_url).filter(u => !/^data:/.test(u)).concat(urls);
             const env = { id: it.id, photo_url: liste.slice(0, MAX_PHOTOS).join('\n'), photo_initiale: !!it.photoInitiale };
+            if (it.pourTous) env.pour_tous = true;
             const pb = it.photoInitiale ? undefined : baseDe(it);
             if (pb !== undefined) env.photo_base = pb;
             saved = (await api('save', { recette: env })).recette;
