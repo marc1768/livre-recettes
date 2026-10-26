@@ -38,6 +38,10 @@
       '<p><b>Préparation</b> : les étapes numérotées dans l\'ordre.</p>' },
     { id: 'notes', titre: 'Noter une recette (étoiles)', html:
       '<p>« Ma note » : touche de 1 à 5 étoiles. Retoucher la même étoile retire ta note. La <b>moyenne</b> de tout le monde s\'affiche à côté et sur les cartes de la liste.</p>' },
+    { id: 'favoris', titre: 'Mes favoris (♥)', html:
+      '<p>Touche le <b>♡</b> en haut à droite d\'une carte, ou le bouton <b>♡ Favoris</b> d\'une fiche : il devient <b>♥</b> et la recette est dans tes favoris. Retouche pour la retirer.</p>' +
+      '<p>Dans la liste, la pastille <b>♡ Favoris</b> (avant « Toutes ») n\'affiche plus que tes favoris ; elle se combine avec la catégorie, la recherche et les autres filtres. Le livre à imprimer reprend aussi ce filtre.</p>' +
+      '<p>Les favoris sont <b>personnels</b> : chacun a les siens, les autres ne les voient pas. Ils te suivent sur tous tes appareils.</p>' },
     { id: 'maversion', titre: '« Ma version » d\'une recette', html:
       '<p>Chacun peut modifier n\'importe quelle recette, mais <b>les modifications ne sont visibles que par lui</b>. Les autres continuent à voir la recette d\'origine.</p>' +
       '<p>Une recette modifiée affiche le bandeau « ✎ Ma version » et le badge « ma version » dans la liste. Le bouton <b>↺ Revenir à l\'original</b> efface ta version.</p>' +

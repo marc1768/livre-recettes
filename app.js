@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.15';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.16';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -18,7 +18,7 @@
   };
   const PHOTO_MAX = 1600, PHOTO_QUALITY = 0.8, TIMEOUT_MS = 60000;
 
-  const S = { data: [], listes: {}, maj: '', user: null, cat: '', q: '', mode: '', statut: '', auteur: '', view: 'list', id: null, busy: false, nouv: false };
+  const S = { data: [], listes: {}, maj: '', user: null, cat: '', q: '', mode: '', statut: '', auteur: '', view: 'list', id: null, busy: false, nouv: false, fav: false };
   let syncEnCours = false;                       // envoi de la file en cours
   const $ = id => document.getElementById(id);
   const app = $('app');
@@ -209,6 +209,7 @@
     const me = S.user ? norm(S.user.nom) : '';
     return S.data.filter(r => {
       if (S.nouv && !estNouvelle(r)) return false;
+      if (S.fav && !r.favori) return false;
       if (S.cat && r.categorie !== S.cat) return false;
       if (S.mode && split(r.modes_cuisson).indexOf(S.mode) < 0) return false;
       if (S.statut && r.statut !== S.statut) return false;
@@ -224,7 +225,9 @@
 
   function buildFilters() {
     const cats = catOrder().filter(c => S.data.some(r => r.categorie === c));
-    $('chips').innerHTML = ['<button class="chip' + (S.cat ? '' : ' on') + '" data-cat="">Toutes</button>']
+    const nf = S.data.filter(r => r.favori).length;
+    $('chips').innerHTML = ['<button class="chip favchip' + (S.fav ? ' on' : '') + '" data-fav="1" aria-pressed="' + S.fav + '">' + (S.fav ? '♥' : '♡') + ' Favoris' + (nf ? ' <small>' + nf + '</small>' : '') + '</button>',
+      '<button class="chip' + (S.cat ? '' : ' on') + '" data-cat="">Toutes</button>']
       .concat(cats.map(c => '<button class="chip' + (S.cat === c ? ' on' : '') + '" data-cat="' + esc(c) + '" style="' + cvar(c) + '"><i></i>' + esc(c) + '</button>')).join('');
     const modes = []; S.data.forEach(r => split(r.modes_cuisson).forEach(m => { if (modes.indexOf(m) < 0) modes.push(m); }));
     $('fMode').innerHTML = '<option value="">Tous les modes de cuisson</option>' + modes.map(m => '<option' + (S.mode === m ? ' selected' : '') + '>' + esc(m) + '</option>').join('');
@@ -259,11 +262,12 @@
     else S.nouv = false;
     if (!S.data.length) { app.innerHTML = h + '<div class="empty">Aucune recette pour l\'instant. Ajoute la première avec « + Recette ».</div>'; return; }
     h += '<div class="count">' + list.length + ' résultat' + (list.length > 1 ? 's' : '') + '</div>';
-    if (!list.length) h += '<div class="empty">Aucune recette ne correspond aux filtres.</div>';
+    if (!list.length) h += '<div class="empty">' + (S.fav && !S.data.some(r => r.favori) ? 'Pas encore de favoris. Touche le ♡ d\'une recette pour l\'ajouter.' : 'Aucune recette ne correspond aux filtres.') + '</div>';
     h += '<div class="grid">' + list.map(r => {
       const ms = mainStep(r);
       return '<div class="card' + (estNouvelle(r) ? ' new' : '') + '" data-id="' + esc(r.id) + '" style="' + cvar(r.categorie) + '">' +
         (estNouvelle(r) ? '<span class="newbadge">NOUVELLE</span>' : '') +
+        favBtn(r) +
         (r.photo_url ? '<img class="thumb" loading="lazy" src="' + esc(photoSrc(photosDe(r)[0], 600)) + '" alt="" onerror="this.outerHTML=phHtmlGlobal(this)">' : phHtml(r.categorie)) +
         '<div class="cbody">' +
           '<div class="cat">' + esc(r.categorie || 'Sans catégorie') + '</div>' +
@@ -277,6 +281,38 @@
         '</div></div>';
     }).join('') + '</div>';
     app.innerHTML = h;
+  }
+
+  // ---------- favoris (propres à chaque personne) ----------
+  function favBtn(r, grand) {
+    return '<button type="button" class="favbtn no-print' + (r.favori ? ' on' : '') + (grand ? ' big' : '') + '" data-favid="' + esc(r.id) + '" aria-pressed="' + !!r.favori + '" aria-label="' + (r.favori ? 'Retirer des favoris' : 'Ajouter aux favoris') + '">' + (r.favori ? '♥' : '♡') + (grand ? (r.favori ? ' Favori' : ' Favoris') : '') + '</button>';
+  }
+  const favFile = () => store.get('lr_favq', {});                 // { id: true/false } en attente d'envoi
+  function appliquerFavFile() { const q = favFile(); S.data.forEach(r => { if (String(r.id) in q) r.favori = q[r.id]; }); }
+  function basculerFavori(id) {
+    const r = S.data.find(x => String(x.id) === String(id));
+    if (!r) return;
+    if (String(r.id).indexOf('TMP') === 0) { toast('Favori possible après l\'envoi de la recette.', true); return; }
+    r.favori = !r.favori;
+    const q = favFile(); q[r.id] = r.favori; store.set('lr_favq', q);
+    saveCache(); render();
+    toast(r.favori ? '♥ Ajoutée à tes favoris' : 'Retirée de tes favoris');
+    envoyerFavoris();
+  }
+  let favEnCours = false;
+  async function envoyerFavoris() {
+    if (favEnCours || !S.user || !tok() || !navigator.onLine) return;
+    favEnCours = true;
+    try {
+      for (;;) {
+        const q = favFile(), ids = Object.keys(q);
+        if (!ids.length) break;
+        const id = ids[0], on = q[id];
+        try { await api('fav', { id: id, on: on }); }
+        catch (e) { if (!e.api) break; toast('Favori non enregistré : ' + e.message, true); }
+        const q2 = favFile(); if (q2[id] === on) { delete q2[id]; store.set('lr_favq', q2); }
+      }
+    } finally { favEnCours = false; }
   }
 
   // ---------- vue : fiche ----------
@@ -329,6 +365,7 @@
     const r = S.data.find(x => String(x.id) === String(S.id));
     if (!r) { S.view = 'list'; return render(); }
     app.innerHTML = '<div class="actions no-print"><button class="btn" data-act="back">← Retour</button>' +
+      favBtn(r, true) +
       '<button class="btn" data-act="edit">✎ Modifier</button>' +
       '<button class="btn" data-act="print">🖨 Imprimer</button>' +
       '<button class="btn" data-help="fiche" aria-label="Aide">❓</button>' +
@@ -610,6 +647,7 @@
 
   async function synchroniser(silencieux) {
     if (syncEnCours || !S.user || !tok()) return;
+    envoyerFavoris();
     if (!mesEnvois().length) return;
     if (!navigator.onLine) { if (!silencieux) toast('Hors ligne : les modifications restent sur le téléphone.', true); return; }
     syncEnCours = true; majSync();
@@ -649,7 +687,7 @@
           // mise à jour de la copie locale avec la réponse du serveur (sauf si une autre modif attend encore)
           if (saved && !enAttente(saved.id)) {
             const i = S.data.findIndex(x => String(x.id) === String(saved.id));
-            const notes = i >= 0 ? { note_moyenne: S.data[i].note_moyenne, note_nb: S.data[i].note_nb, ma_note: S.data[i].ma_note } : { note_moyenne: 0, note_nb: 0, ma_note: 0 };
+            const notes = i >= 0 ? { note_moyenne: S.data[i].note_moyenne, note_nb: S.data[i].note_nb, ma_note: S.data[i].ma_note, favori: !!S.data[i].favori } : { note_moyenne: 0, note_nb: 0, ma_note: 0, favori: false };
             saved = Object.assign({}, saved, notes);
             if (i >= 0) S.data[i] = saved; else S.data.push(saved);
           }
@@ -677,7 +715,7 @@
     try {
       const r0 = (await api('reset', { id: S.id }, { essais: 1 })).recette;
       const i = S.data.findIndex(x => String(x.id) === String(S.id));
-      if (i >= 0) S.data[i] = Object.assign(r0, { note_moyenne: S.data[i].note_moyenne, note_nb: S.data[i].note_nb, ma_note: S.data[i].ma_note });
+      if (i >= 0) S.data[i] = Object.assign(r0, { note_moyenne: S.data[i].note_moyenne, note_nb: S.data[i].note_nb, ma_note: S.data[i].ma_note, favori: !!S.data[i].favori });
       saveCache(); toast('Recette d\'origine rétablie.'); render();
     } catch (e) { toast(e.message, true); } finally { S.busy = false; busy(false); }
   }
@@ -1159,10 +1197,13 @@
     const t = e.target;
     const chip = t.closest('.chip');
     if (chip) {
+      if (chip.hasAttribute('data-fav')) { S.fav = !S.fav; render(); return; }
       if (chip.hasAttribute('data-auteur')) S.auteur = chip.getAttribute('data-auteur');
       else S.cat = chip.getAttribute('data-cat');
       render(); return;
     }
+    const fb = t.closest('[data-favid]');
+    if (fb) { e.stopPropagation(); basculerFavori(fb.getAttribute('data-favid')); return; }
     const card = t.closest('.card');
     if (card) { S.id = card.getAttribute('data-id'); S.view = 'recipe'; render(); return; }
     const gal = t.closest('[data-gal]');
@@ -1240,6 +1281,7 @@
       const locales = S.data.filter(r => enAttente(r.id));
       S.data = auteursPropres(d.recettes);
       locales.forEach(l => { const i = S.data.findIndex(x => String(x.id) === String(l.id)); if (i >= 0) S.data[i] = l; else S.data.push(l); }); S.listes = d.listes || {}; S.maj = d.maj || '';
+      appliquerFavFile();
       S.user = d.user; store.set('lr_user', S.user);
       if (d.token && cfg().token) setCfg({ token: d.token });     // session prolongée par le serveur
       saveCache(); marquerConnues();

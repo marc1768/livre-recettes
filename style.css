@@ -335,3 +335,11 @@ img,video{max-width:100%}
 #collebox{display:grid;gap:6px}
 #collebox textarea{font-size:13px}
 #collebox button{justify-self:start}
+
+/* v5.16 favoris */
+.favbtn{position:absolute;top:8px;right:8px;z-index:3;width:38px;height:38px;border-radius:50%;border:none;background:rgba(255,255,255,.92);color:#c2185b;font-size:22px;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;padding:0}
+.favbtn.on{background:#c2185b;color:#fff}
+.favbtn.big{position:static;width:auto;height:auto;border-radius:999px;padding:8px 14px;font-size:15px;font-weight:600;border:1px solid #c2185b;box-shadow:none}
+.chip.favchip{--c:#c2185b;color:#c2185b;border-color:#c2185b;font-weight:600}
+.chip.favchip.on{color:#fff}
+.chip.favchip small{opacity:.8;font-size:11px}
