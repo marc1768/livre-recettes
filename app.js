@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.18';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.19';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -1208,7 +1208,21 @@
     window.scrollTo(0, 0);
   }
 
+  // Position dans la liste : retenue en quittant la liste, rétablie au retour (fiche, formulaire, livre…)
+  let vuePrec = '', listeY = 0;
+  function retenirPosition() {
+    if (vuePrec === 'list' && S.view !== 'list') listeY = window.scrollY || document.documentElement.scrollTop || 0;
+    const revenir = vuePrec && vuePrec !== 'list' && S.view === 'list';
+    vuePrec = S.view;
+    return revenir;
+  }
+  function retablirPosition() {
+    const y = listeY; if (!y) return;
+    const go = () => window.scrollTo(0, y);
+    go(); requestAnimationFrame(go); setTimeout(go, 120); setTimeout(go, 400);
+  }
   function render() {
+    const revenir = retenirPosition();
     if (!S.user) return renderLogin();
     if (S.user.doit_changer) return renderPassword(true);
     switch (S.view) {
@@ -1221,6 +1235,7 @@
       case 'courses': return renderCourses();
     }
     buildFilters(); renderList();
+    if (revenir) retablirPosition();
   }
 
   // ---------- événements ----------
