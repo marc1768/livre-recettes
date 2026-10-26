@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.14';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.15';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -66,6 +66,9 @@
 
   // ---------- utilitaires ----------
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  // Nom d'auteur uniformisé : « marc » → « Marc »
+  const nomPropre = s => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+  const auteursPropres = l => (l || []).map(r => { if (r && r.auteur) r.auteur = nomPropre(r.auteur); return r; });
   const lines = s => String(s || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
   const split = s => String(s || '').split(/[,;\n]/).map(x => x.trim()).filter(Boolean);
   const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -447,6 +450,7 @@
     window.scrollTo(0, 0);
 
     $('f_dev').addEventListener('change', e => { editDevice = e.target.value; });
+    if ($('f_aut')) $('f_aut').addEventListener('blur', e => { e.target.value = nomPropre(e.target.value); });
     $('f_cat').addEventListener('change', e => { $('form').style.cssText = cvar(e.target.value); });
     $('stepsEd').addEventListener('input', e => {
       const t = e.target;
@@ -555,7 +559,7 @@
       notes_marc: $('f_notes').value.trim()
     };
     if (!rec.titre) { toast('Le titre est obligatoire.', true); return; }
-    if ($('f_aut') && $('f_aut').value.trim()) rec.auteur = $('f_aut').value.trim();
+    if ($('f_aut') && $('f_aut').value.trim()) rec.auteur = nomPropre($('f_aut').value);
     // photos : celles déjà en ligne restent dans photo_url, les nouvelles (data) sont envoyées par la file
     const lienEnCours = $('f_url').value.trim();
     if (lienEnCours && editPhotos.length < MAX_PHOTOS) editPhotos.push({ url: lienEnCours });
@@ -587,7 +591,7 @@
     const loc = Object.assign({}, ancienne, rec, { id: id });
     loc.photo_url = local;
     if (creation) S.draft = null;
-    if (creation) Object.assign(loc, { auteur: rec.auteur || S.user.nom, peut_modifier: true, peut_supprimer: true, note_moyenne: 0, note_nb: 0, ma_note: 0, date_ajout: today });
+    if (creation) Object.assign(loc, { auteur: nomPropre(rec.auteur || S.user.nom), peut_modifier: true, peut_supprimer: true, note_moyenne: 0, note_nb: 0, ma_note: 0, date_ajout: today });
     else if (String(id).indexOf('TMP') !== 0) Object.assign(loc, { ma_version: true, ma_version_date: today });
     const i = S.data.findIndex(x => String(x.id) === String(id));
     if (i >= 0) S.data[i] = loc; else S.data.push(loc);
@@ -1234,7 +1238,7 @@
     try {
       const d = await api('list', force ? { frais: true } : {});
       const locales = S.data.filter(r => enAttente(r.id));
-      S.data = d.recettes || [];
+      S.data = auteursPropres(d.recettes);
       locales.forEach(l => { const i = S.data.findIndex(x => String(x.id) === String(l.id)); if (i >= 0) S.data[i] = l; else S.data.push(l); }); S.listes = d.listes || {}; S.maj = d.maj || '';
       S.user = d.user; store.set('lr_user', S.user);
       if (d.token && cfg().token) setCfg({ token: d.token });     // session prolongée par le serveur
@@ -1310,7 +1314,7 @@
   // Démarrage : affichage immédiat depuis le cache, puis mise à jour
   S.user = store.get('lr_user', null);
   const cache = store.get('lr_cache', null);
-  if (S.user && tok() && cache && cache.recettes) { S.data = cache.recettes; S.listes = cache.listes || {}; S.maj = cache.maj || ''; marquerConnues(); render(); }
+  if (S.user && tok() && cache && cache.recettes) { S.data = auteursPropres(cache.recettes); S.listes = cache.listes || {}; S.maj = cache.maj || ''; marquerConnues(); render(); }
   majReseau(); majSync();
   if (S.user) { chargerCoursesLocal(); majPastille(); }
   const ouvrirCourses = () => { if (!S.user) return; C.vuAff = null; S.view = 'courses'; render(); verifierCourses(true); };
