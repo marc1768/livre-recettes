@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.16';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.17';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -619,6 +619,9 @@
         nonce: Date.now().toString(36) + Math.random().toString(36).slice(2) };
       q.push(it);
     }
+    // photos de la recette d'origine au moment de la modification : si elles ont changé entre-temps
+    // (autre appareil), le serveur n'écrase pas la photo plus récente
+    if (!creation && !('photoBase' in it)) it.photoBase = photosOrigine(ancienne);
     let k = 0; it.ordre = editPhotos.map(p => (p.url ? p.url : '#' + (k++)));   // ordre voulu (photos à envoyer = #0, #1…)
     it.photos = aEnvoyer; delete it.photo;
     setOutbox(q);
@@ -635,6 +638,15 @@
     saveCache();
     toast('✓ Enregistré — envoi au retour à la liste');
     S.id = id; S.view = 'recipe'; render();
+  }
+
+  function photosOrigine(r) {
+    const l = lines(r && r.photo_url).filter(u => !/^data:/.test(u));
+    return (r && r.photos_origine !== undefined && r.photos_origine !== '' ? l.slice(0, +r.photos_origine || 0) : l).join('\n');
+  }
+  function baseDe(it) { return 'photoBase' in it ? it.photoBase : (it.base ? photosOrigine(it.base) : undefined); }
+  function avertirConflit(saved) {
+    if (saved && saved.conflit_photo) toast('La photo de « ' + (saved.titre || 'cette recette') + ' » avait été changée entre-temps sur un autre appareil : la plus récente est gardée.', true);
   }
 
   // Remplace un identifiant provisoire (TMP…) par le vrai après création sur le serveur
@@ -669,10 +681,14 @@
             remplacerId(ancien, saved.id);
             Object.assign(it, k || {});
           } else if (Object.keys(it.rec).length) {
-            const saved = (await api('save', { recette: Object.assign({}, it.rec, { id: it.id }) })).recette;
+            const pb = baseDe(it), env = Object.assign({}, it.rec, { id: it.id });
+            if (pb !== undefined && 'photo_url' in env) env.photo_base = pb;
+            const saved = (await api('save', { recette: env })).recette;
+            avertirConflit(saved);
+            if (saved && saved.conflit_photo) { it.photos = []; const q4 = outbox(); const k4 = q4.find(x => x.qid === it.qid); if (k4) k4.photos = []; setOutbox(q4); }
             const q2 = outbox(); const k = q2.find(x => x.qid === it.qid);
-            if (k) { k.rec = {}; k.base = saved; } setOutbox(q2);
-            it.rec = {}; it.base = saved;
+            if (k) { k.rec = {}; k.base = saved; k.photoBase = photosOrigine(saved); } setOutbox(q2);
+            it.rec = {}; it.base = saved; it.photoBase = photosOrigine(saved);       // notre propre écriture devient la référence
           }
           let saved = it.base;
           const nouvelles = it.photos || (it.photo && it.photo !== 'garder' ? [it.photo] : []);
@@ -681,7 +697,11 @@
             for (const data of nouvelles) urls.push((await api('photo', { id: it.id, mime: 'image/jpeg', data: data }, { essais: 2 })).url);
             const liste = it.ordre ? it.ordre.map(x => (x.charAt(0) === '#' ? urls[+x.slice(1)] : x)).filter(Boolean)
               : lines(saved && saved.photo_url).filter(u => !/^data:/.test(u)).concat(urls);
-            saved = (await api('save', { recette: { id: it.id, photo_url: liste.slice(0, MAX_PHOTOS).join('\n'), photo_initiale: !!it.photoInitiale } })).recette;
+            const env = { id: it.id, photo_url: liste.slice(0, MAX_PHOTOS).join('\n'), photo_initiale: !!it.photoInitiale };
+            const pb = it.photoInitiale ? undefined : baseDe(it);
+            if (pb !== undefined) env.photo_base = pb;
+            saved = (await api('save', { recette: env })).recette;
+            avertirConflit(saved);
           }
           setOutbox(outbox().filter(x => x.qid !== it.qid));
           // mise à jour de la copie locale avec la réponse du serveur (sauf si une autre modif attend encore)
