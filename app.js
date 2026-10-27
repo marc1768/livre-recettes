@@ -7,11 +7,13 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.19';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.20';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
-  const DEFAULT_DEVICES = ['Severin FR 2462', 'Four traditionnel'];
+  const DEFAULT_DEVICES = ['Airfryer', 'Four traditionnel', 'Aucun'];
+  const AUCUN = 'Aucun';
+  const nomDevice = d => (/severin|air ?fryer/i.test(String(d || '')) ? 'Airfryer' : String(d || '').trim());
   const CAT_STYLE = {
     'entree': ['#3d8b5a', '🥗'], 'potage': ['#d08a1e', '🍲'], 'soupe': ['#d08a1e', '🍲'], 'plat': ['#b5522b', '🍽️'],
     'accompagnement': ['#7a8b2e', '🥔'], 'sauce': ['#8a4fa0', '🥣'], 'dessert': ['#d1477a', '🍰'], 'apero': ['#2f7ab5', '🥂'], 'boisson': ['#1d8f8f', '🍹']
@@ -97,7 +99,11 @@
     categories: (S.listes.categories || []).length ? S.listes.categories : DEFAULT_CATS,
     modes: (S.listes.modes_cuisson || []).length ? S.listes.modes_cuisson : DEFAULT_MODES,
     statuts: (S.listes.statuts || []).length ? S.listes.statuts : DEFAULT_STATUTS,
-    appareils: (S.listes.appareils || []).length ? S.listes.appareils : DEFAULT_DEVICES
+    appareils: (() => {
+      const l = []; ((S.listes.appareils || []).length ? S.listes.appareils : DEFAULT_DEVICES).forEach(d => { d = nomDevice(d); if (d && l.indexOf(d) < 0) l.push(d); });
+      if (l.indexOf(AUCUN) < 0) l.push(AUCUN);
+      return l;
+    })()
   });
   function catOrder() {
     const l = listes().categories.slice();
@@ -122,6 +128,7 @@
   // ---------- réglages de cuisson (texte <-> étapes) ----------
   // Format texte (colonne reglages_appareil) : "Appareil | Étape : 170 °C, 15 min (remarque)"
   function parseRegs(txt) {
+    if (/^\s*aucun\s*$/i.test(String(txt || ''))) return { device: AUCUN, steps: [] };
     let device = '';
     const steps = lines(txt).map(l => {
       let rest = l; const p = l.indexOf('|');
@@ -134,7 +141,7 @@
       const rem = (val.match(/\(([^)]*)\)/) || [])[1] || '';
       return { label: label, temp: t ? +t[1] : 0, time: d ? +(d[2] || d[1]) : 0, time2: d && d[2] ? +d[1] : 0, rem: rem, raw: val };
     });
-    return { device: device, steps: steps };
+    return { device: nomDevice(device), steps: steps };
   }
   function stepValue(s) {
     const parts = [];
@@ -143,6 +150,7 @@
     return parts.join(', ') + (s.rem ? ' (' + s.rem + ')' : '');
   }
   function serializeRegs(device, steps) {
+    if (device === AUCUN) return AUCUN;                    // poêle, casserole… : pas de température ni de temps
     return steps.filter(s => s.label || s.temp || s.time)
       .map(s => (device ? device + ' | ' : '') + (s.label || 'Cuisson') + ' : ' + stepValue(s)).join('\n');
   }
@@ -329,8 +337,23 @@
     });
     return h + (open ? '</ul>' : '');
   }
+  // Préparation : une étape par ligne ; « # Titre » = sous-titre (la numérotation repart à 1 sous chaque sous-titre)
+  function etapesHtml(txt) {
+    let h = '', open = false;
+    lines(txt).forEach(l => {
+      if (l.charAt(0) === '#') {
+        if (open) h += '</ol>';
+        h += '<h5>' + esc(l.replace(/^#+\s*/, '')) + '</h5><ol class="steps">'; open = true;
+      } else {
+        if (!open) { h += '<ol class="steps">'; open = true; }
+        h += '<li>' + esc(l.replace(/^\d+[.)]\s*/, '')) + '</li>';
+      }
+    });
+    return h + (open ? '</ol>' : '');
+  }
   function reglagesHtml(r) {
     const p = parseRegs(r.reglages_appareil);
+    if (p.device === AUCUN) return '<div class="dev">Sans appareil de cuisson réglable (poêle, casserole…)</div>';
     if (!p.steps.length) return '';
     return (p.device ? '<div class="dev">' + esc(p.device) + '</div>' : '') + '<div class="regs">' + p.steps.map(s =>
       '<div class="reg"><b>' + esc(s.label) + '</b><span class="v">' +
@@ -355,7 +378,7 @@
         (interactive && photosDe(r).length > 1 ? '<div class="gal no-print">' + photosDe(r).map((u, i) => '<img src="' + esc(photoSrc(u, 300)) + '" data-gal="' + esc(photoSrc(u, 1200)) + '"' + (i ? '' : ' class="on"') + ' alt="Photo ' + (i + 1) + '">').join('') + '</div>' : '') : '');
     if (r.reglages_appareil) h += '<h4>Réglages</h4>' + reglagesHtml(r);
     if (r.ingredients || r.etapes) h += '<div class="cols"><div>' + (r.ingredients ? '<h4>Ingrédients</h4>' + ingredientsHtml(r, interactive) : '') + '</div>' +
-      '<div>' + (r.etapes ? '<h4>Préparation</h4><ol class="steps">' + lines(r.etapes).map(s => '<li>' + esc(s.replace(/^\d+[.)]\s*/, '')) + '</li>').join('') + '</ol>' : '') + '</div></div>';
+      '<div>' + (r.etapes ? '<h4>Préparation</h4>' + etapesHtml(r.etapes) : '') + '</div></div>';
     if (r.notes_marc) h += '<h4>Notes</h4><div class="note">' + esc(r.notes_marc) + '</div>';
     if (r.sources) h += '<h4>Sources</h4><div class="src">' + lines(r.sources).map(linkify).join('<br>') + '</div>';
     return h + '</article>';
@@ -456,12 +479,12 @@
       '<div class="field"><span class="lbl">Modes de cuisson' + H('modes') + '</span><div class="checks">' +
         allModes.map(m => '<label><input type="checkbox" name="mode" value="' + esc(m) + '"' + (mode.indexOf(m) >= 0 ? ' checked' : '') + '>' + esc(m) + '</label>').join('') + '</div></div>' +
       '<div class="field"><span class="lbl">Réglages de cuisson' + H('reglages') + '</span>' +
-        '<div class="row2"><select id="f_dev">' + opt(devs, editDevice) + '</select><small>Température par pas de 5 °C, temps par pas de 1 min. Une ligne par étape.</small></div>' +
+        '<div class="row2"><select id="f_dev">' + opt(devs, editDevice) + '</select><small id="f_devinfo"></small></div>' +
         '<div class="steps-ed" id="stepsEd"></div>' +
-        '<button type="button" class="btn sm" data-act="addstep" style="justify-self:start">+ Ajouter une étape</button></div>' +
+        '<button type="button" class="btn sm" data-act="addstep" id="f_addstep" style="justify-self:start">+ Ajouter une étape</button></div>' +
       '<div class="field"><label for="f_ing">Ingrédients' + H('ingredients') + '</label><small>Un ingrédient par ligne. Ligne commençant par « # » = sous-titre (ex. # Sauce).</small>' +
         '<textarea id="f_ing" rows="8">' + esc(r.ingredients) + '</textarea></div>' +
-      '<div class="field"><label for="f_etp">Préparation' + H('preparation') + '</label><small>Une étape par ligne (numérotation automatique).</small>' +
+      '<div class="field"><label for="f_etp">Préparation' + H('preparation') + '</label><small>Une étape par ligne (numérotation automatique). Ligne commençant par « # » = sous-titre (ex. # Sauce).</small>' +
         '<textarea id="f_etp" rows="8">' + esc(r.etapes) + '</textarea></div>' +
       '<div class="row2">' +
         '<div class="field"><label for="f_st">Statut' + H('statut') + '</label><select id="f_st">' + opt(L.statuts, r.statut || L.statuts[0]) + '</select></div>' +
@@ -489,7 +512,13 @@
     renderStepsEditor();
     window.scrollTo(0, 0);
 
-    $('f_dev').addEventListener('change', e => { editDevice = e.target.value; });
+    const majAppareil = () => {
+      const aucun = editDevice === AUCUN;
+      $('stepsEd').hidden = aucun; $('f_addstep').hidden = aucun;
+      $('f_devinfo').textContent = aucun ? 'Poêle, casserole… : pas de température ni de temps à régler.' : 'Température par pas de 5 °C, temps par pas de 1 min. Une ligne par étape.';
+    };
+    majAppareil();
+    $('f_dev').addEventListener('change', e => { editDevice = e.target.value; majAppareil(); });
     if ($('f_aut')) $('f_aut').addEventListener('blur', e => { e.target.value = nomPropre(e.target.value); });
     $('f_cat').addEventListener('change', e => { $('form').style.cssText = cvar(e.target.value); });
     $('stepsEd').addEventListener('input', e => {

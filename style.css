@@ -346,3 +346,6 @@ img,video{max-width:100%}
 
 /* v5.18 admin */
 .src.adminbar{background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:8px 10px;color:#3730a3}
+
+/* v5.20 sous-titres de préparation */
+.recipe h5 + ol.steps{margin-top:2px}

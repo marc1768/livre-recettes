@@ -57,9 +57,9 @@
     { id: 'modes', titre: 'Modes de cuisson', html:
       '<p>Cases à cocher : coche <b>tous</b> les appareils utilisés (par ex. Air fryer + Poêle). Ils servent au filtre « modes de cuisson » de la liste.</p>' },
     { id: 'reglages', titre: 'Réglages de cuisson', html:
-      '<p>Choisis d\'abord l\'<b>appareil</b>. Ensuite <b>une ligne par étape</b> :</p>' +
+      '<p>Choisis d\'abord l\'<b>appareil</b> : <b>Airfryer</b>, <b>Four traditionnel</b> ou <b>Aucun</b> (poêle, casserole… : les températures et les temps disparaissent). Ensuite <b>une ligne par étape</b> :</p>' +
       '<ul><li><b>Nom</b> de l\'étape : Préchauffage, Cuisson 1, Gratiner…</li>' +
-      '<li><b>Température</b> : boutons − / + par pas de 5 °C (60 à 200 °C pour la Severin / air fryer).</li>' +
+      '<li><b>Température</b> : boutons − / + par pas de 5 °C (60 à 200 °C pour l\'airfryer).</li>' +
       '<li><b>Temps</b> : − / + par pas de 1 minute.</li>' +
       '<li><b>Remarque</b> (facultatif) : « secouer à mi-cuisson », « retourner »…</li></ul>' +
       '<p><b>+ Ajouter une étape</b> pour une ligne de plus, <b>×</b> pour en retirer une.</p>' },
@@ -71,7 +71,8 @@
     { id: 'preparation', titre: 'Préparation (étapes numérotées)', html:
       '<p><b>Une étape par ligne</b> : la numérotation est <b>automatique</b>. N\'écris pas « 1. », il serait de toute façon retiré pour éviter « 1. 1. ».</p>' +
       '<pre>Préchauffer l\'air fryer.\nMélanger la farine et l\'œuf.\nCuire 12 min en secouant à mi-cuisson.</pre>' +
-      '<p>Les lignes vides sont ignorées. Pour couper une longue étape, passe simplement à la ligne.</p>' },
+      '<p>Les lignes vides sont ignorées. Pour couper une longue étape, passe simplement à la ligne.</p>'  +
+      '<p>Une ligne qui commence par <b>#</b> devient un <b>sous-titre</b> ; la numérotation repart à 1 en dessous :</p><pre># Pâte\nMélanger la farine et l\'œuf\nLaisser reposer\n# Sauce\nChauffer la crème</pre>' },
     { id: 'statut', titre: 'Statut, sources, notes', html:
       '<p><b>Statut</b> : À tester, Testée… (sert de filtre).</p>' +
       '<p><b>Sources</b> : livre, site, personne… Sépare-les par « ; ». Les liens web deviennent cliquables sur la fiche.</p>' +
