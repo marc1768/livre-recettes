@@ -19,7 +19,8 @@
     { id: 'recherche', titre: 'Rechercher et filtrer', html:
       '<p><b>Recherche</b> : tape un mot du titre, d\'un ingrédient ou des notes (les accents ne comptent pas). Plusieurs mots = toutes les recettes qui contiennent tous ces mots.</p>' +
       '<p><b>Catégories</b> : les pastilles colorées (Entrée, Plat, Dessert…). « Toutes » enlève le filtre.</p>' +
-      '<p><b>Menus déroulants</b> : mode de cuisson, statut (À tester, Testée…) et <b>« Ajoutées par »</b> (une personne, Severin…). Les filtres se combinent.</p>' },
+      '<p><b>Menus déroulants</b> : mode de cuisson, statut (À tester, Testée…) et <b>« Ajoutées par »</b> (une personne, Severin…). Les filtres se combinent.</p>' +
+      '<p><b>Revenir en haut</b> : dans une longue liste, touche le bouton rond <b>↑ Haut</b> en bas à droite (il apparaît quand tu descends), ou touche le titre « Livre de recettes ».</p>' },
     { id: 'nouvelles', titre: 'Nouvelles recettes (en rouge)', html:
       '<p>Quand quelqu\'un d\'autre a ajouté une recette depuis ta dernière ouverture de l\'appli : bandeau rouge <b>« 🔴 N nouvelles recettes »</b> et badge <b>NOUVELLE</b> sur les fiches.</p>' +
       '<p>Toucher le bandeau n\'affiche que les nouvelles ; le retoucher affiche tout. À l\'ouverture suivante de l\'appli, elles ne sont plus marquées. Tes propres ajouts ne sont jamais marqués.</p>' },

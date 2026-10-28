@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.20';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.21';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -1250,7 +1250,19 @@
     const go = () => window.scrollTo(0, y);
     go(); requestAnimationFrame(go); setTimeout(go, 120); setTimeout(go, 400);
   }
+  // Bouton flottant « ↑ Haut » : visible dans la liste dès qu'on a descendu d'un écran ; le titre du livre remonte aussi en haut
+  const btnHaut = document.createElement('button');
+  btnHaut.type = 'button'; btnHaut.className = 'tophaut no-print'; btnHaut.hidden = true;
+  btnHaut.setAttribute('aria-label', 'Revenir en haut de la liste'); btnHaut.innerHTML = '↑<small>Haut</small>';
+  document.body.appendChild(btnHaut);
+  const allerEnHaut = () => { try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); } };
+  btnHaut.addEventListener('click', allerEnHaut);
+  function majBtnHaut() { btnHaut.hidden = !(S.view === 'list' && S.user && (window.scrollY || 0) > window.innerHeight * 0.8); }
+  window.addEventListener('scroll', majBtnHaut, { passive: true });
+  const brand = document.querySelector('.brand');
+  if (brand) { brand.style.cursor = 'pointer'; brand.title = 'Revenir en haut'; brand.addEventListener('click', () => { if (S.view === 'list') allerEnHaut(); }); }
   function render() {
+    setTimeout(majBtnHaut, 0);
     const revenir = retenirPosition();
     if (!S.user) return renderLogin();
     if (S.user.doit_changer) return renderPassword(true);
