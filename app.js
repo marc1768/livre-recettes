@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.21';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.22';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -74,6 +74,20 @@
   const lines = s => String(s || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
   const split = s => String(s || '').split(/[,;\n]/).map(x => x.trim()).filter(Boolean);
   const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  // ---------- auteurs : même nom écrit autrement (« tiktok », « Tik Tok », « tik-tok ») = un seul auteur ----------
+  const cleAuteur = s => norm(s).replace(/[\s._\-'’@()]+/g, '');
+  function listeAuteurs() {
+    const m = {};                                        // clé → { noms: {orthographe: nb}, nb }
+    const ajoute = (a, n) => { a = String(a || '').trim(); const k = cleAuteur(a); if (!k) return;
+      const e = m[k] || (m[k] = { noms: {}, nb: 0 }); e.noms[a] = (e.noms[a] || 0) + n; e.nb += n; };
+    S.data.forEach(r => ajoute(r.auteur, 1));
+    if (S.user) ajoute(S.user.nom, 0);
+    return Object.keys(m).map(k => { const e = m[k];
+      const nom = Object.keys(e.noms).sort((a, b) => e.noms[b] - e.noms[a] || a.localeCompare(b, 'fr'))[0];
+      return { cle: k, nom: nom, nb: e.nb }; }).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+  }
+  const auteurConnu = s => { const k = cleAuteur(s); return k ? listeAuteurs().find(a => a.cle === k) || null : null; };
+  const auteurFinal = s => { const a = auteurConnu(s); return a ? a.nom : nomPropre(s); };
   const linkify = s => esc(s).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
   const catStyle = c => CAT_STYLE[norm(c)] || ['#7a746b', '🍴'];
   // Illustration quand la recette n'a pas de photo : casserole dessinée sur la couleur de la catégorie
@@ -460,7 +474,6 @@
     // photo principale : seul le créateur de la recette peut la changer (pour tout le monde)
     principaleBloquee = !!(r.id && r.peut_photo === false && editPhotos.length && !estAdmin());   // l'admin peut tout changer (« pour tout le monde »)
     nVerrou = principaleBloquee ? Math.min(editPhotos.length, r.photos_origine > 0 ? r.photos_origine : 1) : 0;   // photos du créateur : intouchables
-    const auteurs = []; S.data.forEach(x => { if (x.auteur && auteurs.indexOf(x.auteur) < 0) auteurs.push(x.auteur); });
     const doublon = imp && S.data.find(x => norm(x.titre) === norm(imp.titre));
     app.innerHTML =
       '<form class="edit" id="form" autocomplete="off" style="' + cvar(r.categorie || 'Plat') + '">' +
@@ -475,7 +488,8 @@
         '<div class="field"><label for="f_pers">Personnes</label><input type="number" min="1" id="f_pers" value="' + esc(r.personnes || 2) + '"></div>' +
         '<div class="field"><label for="f_temps">Temps total (min)</label><input type="number" min="0" id="f_temps" value="' + esc(r.temps_min) + '"></div>' +
       '</div>' +
-      (estAdmin() ? '<div class="field"><label for="f_aut">Auteur' + H(r.id ? 'admin' : 'importer') + (r.id ? ' <small>(changé seulement avec « pour tout le monde »)</small>' : '') + '</label><input type="text" id="f_aut" list="f_autl" value="' + esc(r.auteur || S.user.nom) + '"><datalist id="f_autl">' + auteurs.map(a => '<option value="' + esc(a) + '">').join('') + '</datalist></div>' : '') +
+      (estAdmin() ? '<div class="field"><label for="f_aut">Auteur' + H(r.id ? 'admin' : 'importer') + (r.id ? ' <small>(changé seulement avec « pour tout le monde »)</small>' : '') + '</label><div class="combo"><input type="text" id="f_aut" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="f_autl" autocomplete="off" value="' + esc(imp ? auteurFinal(r.auteur || S.user.nom) : (r.auteur || S.user.nom)) + '">' +
+        '<button type="button" class="combo-btn" id="f_autbtn" tabindex="-1" aria-label="Voir tous les auteurs">▾</button><ul class="combo-list" id="f_autl" role="listbox" hidden></ul></div><small id="f_autinfo"></small></div>' : '') +
       '<div class="field"><span class="lbl">Modes de cuisson' + H('modes') + '</span><div class="checks">' +
         allModes.map(m => '<label><input type="checkbox" name="mode" value="' + esc(m) + '"' + (mode.indexOf(m) >= 0 ? ' checked' : '') + '>' + esc(m) + '</label>').join('') + '</div></div>' +
       '<div class="field"><span class="lbl">Réglages de cuisson' + H('reglages') + '</span>' +
@@ -519,7 +533,7 @@
     };
     majAppareil();
     $('f_dev').addEventListener('change', e => { editDevice = e.target.value; majAppareil(); });
-    if ($('f_aut')) $('f_aut').addEventListener('blur', e => { e.target.value = nomPropre(e.target.value); });
+    if ($('f_aut')) initComboAuteur();
     $('f_cat').addEventListener('change', e => { $('form').style.cssText = cvar(e.target.value); });
     $('stepsEd').addEventListener('input', e => {
       const t = e.target;
@@ -564,6 +578,53 @@
       const pour = e.submitter && e.submitter.dataset ? e.submitter.dataset.pour : '';
       enregistrer(r, pour === 'tous');
     });
+  }
+
+  // Champ « Auteur » : on tape → liste des auteurs qui correspondent ; flèche ▾ → toute la liste
+  function initComboAuteur() {
+    const inp = $('f_aut'), btn = $('f_autbtn'), ul = $('f_autl'), info = $('f_autinfo');
+    let items = [], actif = -1;
+    const fermer = () => { ul.hidden = true; inp.setAttribute('aria-expanded', 'false'); actif = -1; };
+    const majInfo = () => {
+      const v = inp.value.trim(), a = auteurConnu(v);
+      info.className = 'combo-info';
+      if (!v) info.textContent = '';
+      else if (a && a.nom === v) { info.textContent = '✓ Auteur existant (' + a.nb + ' recette' + (a.nb > 1 ? 's' : '') + ')'; info.classList.add('ok'); }
+      else if (a) { info.textContent = '↪ Sera enregistré comme « ' + a.nom + ' » (auteur existant)'; info.classList.add('warn'); }
+      else info.textContent = '＋ Nouvel auteur : « ' + nomPropre(v) + ' »';
+    };
+    const ouvrir = tout => {
+      const k = cleAuteur(inp.value), l = listeAuteurs();
+      items = tout || !k ? l : l.filter(a => a.cle.indexOf(k) >= 0).sort((a, b) => (b.cle.indexOf(k) === 0) - (a.cle.indexOf(k) === 0) || a.nom.localeCompare(b.nom, 'fr'));
+      actif = -1;
+      ul.innerHTML = items.length ? items.map((a, i) => '<li role="option" id="f_auto' + i + '" data-i="' + i + '"' + (a.cle === k ? ' class="sel"' : '') + '>' + esc(a.nom) + '<small>' + a.nb + '</small></li>').join('')
+        : '<li class="vide">Aucun auteur existant ne correspond : nouvel auteur.</li>';
+      ul.hidden = false; inp.setAttribute('aria-expanded', 'true');
+    };
+    const choisir = i => { const a = items[i]; if (!a) return; inp.value = a.nom; fermer(); majInfo(); };
+    const surligner = i => {
+      if (!items.length) return;
+      actif = (i + items.length) % items.length;
+      ul.querySelectorAll('li').forEach((li, j) => li.classList.toggle('on', j === actif));
+      const li = ul.querySelector('[data-i="' + actif + '"]'); if (li) { li.scrollIntoView({ block: 'nearest' }); inp.setAttribute('aria-activedescendant', li.id); }
+    };
+    inp.addEventListener('input', () => { ouvrir(false); majInfo(); });
+    inp.addEventListener('focus', () => { if (!inp.value.trim()) ouvrir(true); });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); if (ul.hidden) ouvrir(!inp.value.trim()); surligner(actif + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); if (ul.hidden) ouvrir(!inp.value.trim()); surligner(actif - 1); }
+      else if (e.key === 'Enter' && !ul.hidden) { e.preventDefault(); if (actif >= 0) choisir(actif); else fermer(); }
+      else if (e.key === 'Escape' && !ul.hidden) { e.preventDefault(); fermer(); }
+    });
+    inp.addEventListener('blur', () => setTimeout(() => {
+      if (document.activeElement === inp) return;
+      fermer(); if (inp.value.trim()) inp.value = auteurFinal(inp.value); majInfo();
+    }, 150));
+    ul.addEventListener('mousedown', e => e.preventDefault());              // garder le curseur dans le champ
+    ul.addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) choisir(+li.dataset.i); });
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('click', () => { if (ul.hidden) { ouvrir(true); inp.focus(); } else fermer(); });
+    majInfo();
   }
 
   const photoItem = u => (/^data:/.test(u) ? { data: u } : { url: u });
@@ -632,7 +693,7 @@
       notes_marc: $('f_notes').value.trim()
     };
     if (!rec.titre) { toast('Le titre est obligatoire.', true); return; }
-    if ($('f_aut') && $('f_aut').value.trim() && (!ancienne.id || pourTous)) rec.auteur = nomPropre($('f_aut').value);
+    if ($('f_aut') && $('f_aut').value.trim() && (!ancienne.id || pourTous)) rec.auteur = auteurFinal($('f_aut').value);
     // photos : celles déjà en ligne restent dans photo_url, les nouvelles (data) sont envoyées par la file
     const lienEnCours = $('f_url').value.trim();
     if (lienEnCours && editPhotos.length < MAX_PHOTOS) editPhotos.push({ url: lienEnCours });
