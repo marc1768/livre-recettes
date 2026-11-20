@@ -372,3 +372,13 @@ img,video{max-width:100%}
 .combo-list li.vide:hover{background:none}
 .field small.combo-info.ok{color:var(--ok)}
 .field small.combo-info.warn{color:var(--warn);font-weight:600}
+
+/* v5.23 : courses lisibles (cases sur plusieurs lignes) + pastille du caddie = nombre d'articles */
+.courses .crow{align-items:start}
+.courses .crow textarea{width:100%;min-width:0;box-sizing:border-box;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);
+  font:inherit;color:inherit;line-height:1.3;resize:none;overflow:hidden;display:block;min-height:38px;white-space:pre-wrap;overflow-wrap:anywhere}
+.courses .crow.done textarea{text-decoration:line-through;color:var(--muted);background:#f3f6f3}
+.courses .crow.new textarea{border-color:#d32f2f;background:#fdecec}
+.cbtn .dot{background:#e47911}
+.cbtn .dot.neuf{background:#d32f2f;animation:lrpuls 1.6s ease-in-out 3}
+@keyframes lrpuls{50%{transform:scale(1.25)}}

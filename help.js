@@ -28,7 +28,7 @@
       '<ul><li><b>↻</b> : recharge la liste depuis le serveur (pour voir tout de suite les ajouts des autres).</li>' +
       '<li><b>⬆ n</b> (orange) : n modifications attendent d\'être envoyées ; touche-le pour les envoyer maintenant.</li>' +
       '<li><b>📖 Livre</b> : le livre complet à imprimer ou enregistrer en PDF.</li>' +
-      '<li><b>🛒</b> : la liste de courses ; une pastille rouge indique le nombre d\'articles ajoutés par les personnes qui partagent leur liste avec toi.</li>' +
+      '<li><b>🛒</b> : la liste de courses ; la pastille indique le nombre d\'articles à acheter (orange), en rouge quand quelqu\'un en a ajouté.</li>' +
       '<li><b>+ Recette</b> : nouvelle recette.</li><li><b>Avatar</b> : ton compte, l\'aide, la déconnexion.</li></ul>' },
 
     { groupe: 'La fiche recette' },
@@ -110,10 +110,12 @@
       '<li><b>🗑</b> : supprime la ligne ; les lignes du dessous remontent.</li>' +
       '<li><b>🧹 Retirer les articles cochés</b> : après les courses, enlève d\'un coup tout ce qui est coché.</li>' +
       '<li><b>🗑 Vider ma liste</b> (toucher deux fois) : efface toute ta liste (seulement la tienne).</li></ul>' +
-      '<p>Les modifications sont enregistrées tout de suite sur le téléphone puis envoyées ; si deux personnes modifient en même temps, les deux modifications sont gardées. Hors ligne, elles partent dès que le réseau revient.</p>' },
+      '<p>Les modifications sont enregistrées tout de suite sur le téléphone puis envoyées ; si deux personnes modifient en même temps, les deux modifications sont gardées. Hors ligne, elles partent dès que le réseau revient.</p>' +
+      '<p><b>Pastille sur le caddie 🛒</b> : le chiffre indique le nombre d\'articles encore à acheter (ta liste + les listes partagées avec toi). Elle est <b>orange</b> en temps normal et <b>rouge</b> quand quelqu\'un a ajouté des articles que tu n\'as pas encore vus. Les articles cochés ✓ ne sont pas comptés.</p>' +
+      '<p>Un nom d\'article long s\'affiche <b>sur plusieurs lignes</b> : la case s\'agrandit pour tout montrer.</p>' },
     { id: 'partage', titre: 'Partager la liste de courses', html:
       '<p><b>👥 Partager ma liste</b> : coche les personnes de la famille. Elles voient ta liste et peuvent la <b>modifier</b> (ajouter, cocher, supprimer). Tu ne vois la liste de quelqu\'un que s\'il l\'a partagée avec toi.</p>' +
-      '<p><b>Nouveautés</b> : quand quelqu\'un ajoute des articles à une liste que tu vois, une <b>pastille rouge</b> avec leur nombre apparaît sur 🛒 et ces lignes sont encadrées en rouge. La pastille disparaît dès que tu ouvres les courses. L\'appli vérifie toutes les 2 minutes quand elle est ouverte, et à chaque retour dans l\'appli.</p>' +
+      '<p><b>Nouveautés</b> : quand quelqu\'un ajoute des articles à une liste que tu vois, la pastille de 🛒 passe au <b>rouge</b> et ces lignes sont encadrées en rouge. Elle redevient orange dès que tu ouvres les courses. L\'appli vérifie toutes les 2 minutes quand elle est ouverte, et à chaque retour dans l\'appli.</p>' +
       '<p><b>Pastille sur l\'icône de l\'appli</b> (iPhone iOS 16.4 ou plus, appli installée, notifications activées) : chaque notification ajoute au chiffre rouge de l\'icône le nombre d\'articles ajoutés. Il revient à zéro dès que tu ouvres les courses. Pour l\'essayer seul : « Tester la pastille (appli fermée) », puis ferme l\'appli et attends 1 à 2 minutes.</p>' },
 
     { id: 'notifications', titre: 'Notifications sur le téléphone', html:

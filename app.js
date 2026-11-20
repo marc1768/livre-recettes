@@ -7,7 +7,7 @@
   const DEFAULT_API = 'https://script.google.com/macros/s/AKfycby4o7MSXGk4P5NFOqeu-wKmXrXi3AO_fDGANKazVIILqqDuxztUm_OGAcX0006YRi2Z/exec';
   // Anciennes API (compte Google précédent) : remplacées automatiquement sur les appareils déjà installés
   const OLD_APIS = ['https://script.google.com/macros/s/AKfycbygtRHPOZTNVlTeTfCF9lMbL4I9BOFc43uPRL_2H_-oRzHAZiuQCtm5ZLGsfgFyIM8/exec'];
-  const APP_VERSION = 'v5.22';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
+  const APP_VERSION = 'v5.23';                   // affiché dans l'en-tête : à changer à chaque mise à jour (avec VERSION de sw.js)
   const DEFAULT_CATS = ['Entrée', 'Potage', 'Plat', 'Accompagnement', 'Sauce', 'Dessert', 'Apéro', 'Boisson'];
   const DEFAULT_MODES = ['Air fryer', 'Four', 'Poêle', 'Casserole', 'Vapeur', 'Barbecue', 'Grill', 'Gaufrier', 'Raclette', 'Micro-ondes', 'Blender', 'Robot', 'Sorbetière', 'Extracteur de jus', 'Mousseur à lait', 'Machine à café', 'Four à pizza', 'Sans cuisson'];
   const DEFAULT_STATUTS = ['À tester', 'Testé – OK', 'Testé – à ajuster', 'Abandonné'];
@@ -894,7 +894,7 @@
     } else if (o.op === 'partage') {
       C.ops = C.ops.filter(x => x.envoye || x.op !== 'partage'); C.ops.push(o);
     } else C.ops.push(o);
-    appliquerOp(o); sauverCoursesLocal(); etatCourses();
+    appliquerOp(o); sauverCoursesLocal(); etatCourses(); majPastille();
     clearTimeout(coursesT); coursesT = setTimeout(envoyerCourses, delai == null ? 1200 : delai);
   }
   function recevoir(j) {
@@ -937,10 +937,19 @@
     const vu = {}; toutesListes().forEach(l => { vu[l.nom] = l.items.map(it => it.id); });
     store.set(cleCourses() + '_vu', vu); majPastille();
   }
+  // Articles à acheter (non cochés) dans ma liste et les listes partagées avec moi
+  const nbArticlesCourses = () => toutesListes().reduce((n, l) => n + l.items.filter(it => !it.ok && (String(it.p || '').trim() || String(it.q || '').trim())).length, 0);
   function majPastille() {
     const n = S.user && S.view !== 'courses' ? nbNouveauxCourses() : 0;
+    // Pastille du caddie : nombre d'articles dans le caddie (comme un panier) ; rouge s'il y a des nouveautés ajoutées par d'autres
+    const total = S.user ? nbArticlesCourses() : 0;
     const d = $('coursesDot');
-    if (d) { d.hidden = !n; d.textContent = n > 9 ? '9+' : String(n); }
+    if (d) {
+      d.hidden = !total; d.textContent = total > 99 ? '99+' : String(total);
+      d.classList.toggle('neuf', !!n);
+      const b = $('btnCourses');
+      if (b) b.title = total ? 'Liste de courses : ' + total + ' article' + (total > 1 ? 's' : '') + ' à acheter' + (n ? ' — nouveautés ajoutées par d\'autres' : '') : 'Liste de courses';
+    }
     try {                                            // pastille sur l'icône de l'appli (si le téléphone l'autorise)
       if (n && navigator.setAppBadge) navigator.setAppBadge(n).catch(() => {});
       else if (!n && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
@@ -963,8 +972,8 @@
     const nouveau = it && C.vuAff && !estMoi(auteurArticle(it, l)) && (C.vuAff[l.nom] || []).indexOf(it.id) < 0;
     return '<div class="crow' + (it && it.ok ? ' done' : '') + (nouveau ? ' new' : '') + '" data-id="' + (it ? esc(it.id) : '') + '"' +
       (it && !estMoi(auteurArticle(it, l)) ? ' title="Ajouté par ' + esc(auteurArticle(it, l)) + '"' : '') + '>' +
-      '<input class="cp" type="text" placeholder="Ingrédient" value="' + esc(it ? it.p : '') + '" enterkeyhint="next" autocapitalize="sentences">' +
-      '<input class="cq" type="text" placeholder="Quantité" value="' + esc(it ? it.q : '') + '" enterkeyhint="next">' +
+      '<textarea class="cp" rows="1" placeholder="Ingrédient" enterkeyhint="next" autocapitalize="sentences">' + esc(it ? it.p : '') + '</textarea>' +
+      '<textarea class="cq" rows="1" placeholder="Quantité" enterkeyhint="next">' + esc(it ? it.q : '') + '</textarea>' +
       '<button type="button" class="cok" aria-label="Acheté / disponible"' + (vide ? ' hidden' : '') + '>✓</button>' +
       '<button type="button" class="ctrash" aria-label="Supprimer la ligne"' + (vide ? ' hidden' : '') + '>🗑</button></div>';
   }
@@ -1002,9 +1011,17 @@
     if (partOuvert) { renderPartage(); $('cpart').hidden = false; }
     etatCourses(); marquerCoursesVues();
     const box = $('courses');
+    // Textes longs : la case s'agrandit sur plusieurs lignes pour tout afficher
+    const ajuster = el => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; };
+    box.querySelectorAll('.crow textarea').forEach(ajuster);
+    requestAnimationFrame(() => box.querySelectorAll('.crow textarea').forEach(ajuster));
     const article = row => ({ id: row.dataset.id, p: row.querySelector('.cp').value, q: row.querySelector('.cq').value, ok: row.classList.contains('done') });
     box.addEventListener('input', e => {
       const row = e.target.closest('.crow'); if (!row) return;
+      if (e.target.tagName === 'TEXTAREA') {
+        if (/[\r\n]/.test(e.target.value)) e.target.value = e.target.value.replace(/\s*[\r\n]+\s*/g, ' ');   // collage sur plusieurs lignes
+        ajuster(e.target);
+      }
       const nom = row.closest('.cliste').dataset.l;
       if (!row.dataset.id) row.dataset.id = nouvelId();
       const it = article(row);
